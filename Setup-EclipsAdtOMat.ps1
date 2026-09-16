@@ -16,7 +16,7 @@
 .PARAMETER InstallPath
     Directory where the Eclipse installation will be created. If the directory
     already exists and is not empty, a subfolder 'eclipse' will be created
-    inside it. Defaults to '.\eclipse-adt' next to this script.
+    inside it. Defaults to '~\Documents\eclipse'.
 
 .PARAMETER BasePackage
     Base Eclipse package id to install from catalog.json's basePackages, e.g.
@@ -90,7 +90,10 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptRoot 'lib\Ui.ps1')
 . (Join-Path $scriptRoot 'lib\Download.ps1')
 . (Join-Path $scriptRoot 'lib\P2Director.ps1')
+. (Join-Path $scriptRoot 'lib\EclipseInstall.ps1')
 . (Join-Path $scriptRoot 'lib\Menu.ps1')
+. (Join-Path $scriptRoot 'lib\Catalog.ps1')
+. (Join-Path $scriptRoot 'lib\Wizard.ps1')
 
 $catalogPath = Join-Path $scriptRoot 'catalog.json'
 if (-not (Test-Path -LiteralPath $catalogPath)) {
@@ -121,7 +124,7 @@ Initialize-BundlerLog -LogDirectory (Join-Path $scriptRoot 'logs') | Out-Null
 Write-Log "Parameters: InstallPath='$InstallPath' BasePackage='$BasePackage' EclipseVersion='$EclipseVersion' Features=$($Features -join ',') DevEposChannel='$DevEposChannel' NonInteractive=$NonInteractive CacheDirectory='$CacheDirectory'" -Level DEBUG
 
 if (-not $NonInteractive -and (Test-InteractiveConsole)) {
-    Write-Banner -Title 'eclipsADT-o-Mat' -Subtitle 'Eclipse + ABAP Development Tools + Additional Plugins'
+    Write-Banner -Title 'eclipsADT-o-Mat' -Subtitle 'Installer for Eclipse + ABAP Development Tools + Additional Plugins'
 }
 Write-Log "eclipsADT-o-Mat starting." -Level INFO
 
@@ -129,336 +132,42 @@ if ($NonInteractive -and -not $EclipseVersion) {
     throw "-NonInteractive requires -EclipseVersion to be specified (use -ListFeatures to see available versions)."
 }
 
-function Get-SupportedEclipseVersions {
-    <#
-    .SYNOPSIS
-        Returns the catalog.eclipseVersions entries supported by a given base
-        package (all of them for template-based packages, only the ones with
-        a 'downloads' entry for packages that use per-version URLs).
-    #>
-    param($BasePackageEntry)
-
-    if ($BasePackageEntry.downloads) {
-        $supportedIds = @($BasePackageEntry.downloads.PSObject.Properties.Name)
-        $supported = @($catalog.eclipseVersions | Where-Object { $_.id -in $supportedIds })
-        Write-Log "Get-SupportedEclipseVersions: '$($BasePackageEntry.id)' supports $($supported.Count) of $($catalog.eclipseVersions.Count) version(s)" -Level DEBUG
-        return $supported
-    }
-    return @($catalog.eclipseVersions)
-}
-
-function Resolve-BasePackageDownload {
-    <#
-    .SYNOPSIS
-        Resolves the primary/fallback download URLs and cache file name for a
-        base package + Eclipse version, whether the package is templated
-        (java, rcp, ...) or uses explicit per-version URLs (platform).
-    #>
-    param($BasePackageEntry, [string]$Version)
-
-    if ($BasePackageEntry.downloads) {
-        $entry = $BasePackageEntry.downloads.$Version
-        if (-not $entry) {
-            throw "Base package '$($BasePackageEntry.id)' does not support Eclipse version '$Version'. Run with -ListFeatures to see supported versions."
-        }
-        $url = $entry.url
-        $fallbackUrl = $entry.fallbackUrl
-    } else {
-        $url = Expand-Template -Template $BasePackageEntry.urlTemplate -Version $Version
-        $fallbackUrl = Expand-Template -Template $BasePackageEntry.fallbackUrlTemplate -Version $Version
-    }
-
-    # Derive the cache file name from the (query-string free) fallback URL's leaf segment.
-    $zipFileName = Split-Path -Leaf ([uri]$fallbackUrl).AbsolutePath
-
-    Write-Log "Resolve-BasePackageDownload: url='$url' fallbackUrl='$fallbackUrl' zipFileName='$zipFileName'" -Level DEBUG
-    return [PSCustomObject]@{ Url = $url; FallbackUrl = $fallbackUrl; ZipFileName = $zipFileName }
-}
-
-function Expand-Template {
-    param([string]$Template, [string]$Version)
-    return $Template.Replace('{version}', $Version)
-}
-
 # --- Step 1: base package -----------------------------------------------------
-if (-not $BasePackage) {
-    $defaultBasePackage = $catalog.basePackages | Where-Object { $_.default } | Select-Object -First 1
-    if (-not $defaultBasePackage) { $defaultBasePackage = $catalog.basePackages[0] }
-    if ($NonInteractive) {
-        $BasePackage = $defaultBasePackage.id
-    } else {
-        Write-StepHeader -Step 1 -Total 6 -Title 'Base package'
-        $defaultIndex = [Math]::Max(0, [Array]::IndexOf(@($catalog.basePackages.id), $defaultBasePackage.id))
-        $chosen = Read-MenuChoice -Title "Select the base Eclipse package to install/modify:" `
-            -Options $catalog.basePackages -LabelProperty 'name' -DefaultIndex $defaultIndex
-        $BasePackage = $chosen.id
-    }
-}
-$basePackageEntry = $catalog.basePackages | Where-Object { $_.id -eq $BasePackage }
-if (-not $basePackageEntry) {
-    throw "Unknown base package '$BasePackage'. Run with -ListFeatures to see valid values."
-}
-Write-Log "Selected base package: $($basePackageEntry.id)" -Level INFO
-
-$supportedVersions = Get-SupportedEclipseVersions -BasePackageEntry $basePackageEntry
-if ($supportedVersions.Count -eq 0) {
-    throw "Base package '$BasePackage' does not support any known Eclipse version."
-}
-Write-Log "Supported Eclipse versions for '$BasePackage': $(($supportedVersions.id) -join ', ')" -Level DEBUG
+$basePackageEntry = Resolve-BasePackageSelection -Catalog $catalog -BasePackage $BasePackage -NonInteractive:$NonInteractive
 
 # --- Step 2: Eclipse version --------------------------------------------------
-if (-not $EclipseVersion) {
-    if ($NonInteractive) { throw "-EclipseVersion is required in non-interactive mode." }
-    Write-StepHeader -Step 2 -Total 6 -Title 'Eclipse release'
-    $chosen = Read-MenuChoice -Title "Select an Eclipse release train to install:" `
-        -Options $supportedVersions -LabelProperty 'label' -DefaultIndex ($supportedVersions.Count - 1)
-    $EclipseVersion = $chosen.id
-} else {
-    $match = $supportedVersions | Where-Object { $_.id -eq $EclipseVersion }
-    if (-not $match) {
-        throw "Eclipse version '$EclipseVersion' is not supported by base package '$BasePackage'. Run with -ListFeatures to see valid values."
-    }
-}
-Write-Log "Selected Eclipse version: $EclipseVersion" -Level INFO
-Write-Log "Eclipse version resolved via $(if ($NonInteractive) { 'parameter' } else { 'menu' }): '$EclipseVersion'" -Level DEBUG
+$EclipseVersion = Resolve-EclipseVersionSelection -Catalog $catalog -BasePackageEntry $basePackageEntry -EclipseVersion $EclipseVersion -NonInteractive:$NonInteractive
 
 # --- Step 3: install path ----------------------------------------------------
-# Set when the user opts to add ADT/plugins to an already-installed Eclipse of
-# the matching version; skips the download/extract step later.
-$reuseExistingEclipseRoot = $null
-$defaultPath = Join-Path (Get-Location) 'eclipse-adt'
-
-if ($NonInteractive) {
-    if (-not $InstallPath) { $InstallPath = $defaultPath }
-    $existingRoot = Find-ExistingEclipse -InstallPath $InstallPath
-    if ($existingRoot) {
-        $installedVersion = Resolve-EclipseVersionIdFromInstall -EclipseRoot $existingRoot -EclipseVersions $catalog.eclipseVersions
-        if ($installedVersion -ne $EclipseVersion) {
-            Write-Log "Existing Eclipse at '$existingRoot' is version '$installedVersion' but '$EclipseVersion' was requested. Installation cancelled." -Level ERROR
-            exit 1
-        }
-        if (-not (Test-ExistingEclipseBasePackage -EclipseRoot $existingRoot -BasePackageEntry $basePackageEntry)) {
-            Write-Log "Existing Eclipse at '$existingRoot' does not match the requested base package '$BasePackage'. Installation cancelled." -Level ERROR
-            exit 1
-        }
-        Write-Log "Reusing existing Eclipse ($EclipseVersion) at '$existingRoot'." -Level INFO
-        $reuseExistingEclipseRoot = $existingRoot
-    }
-} else {
-    Write-StepHeader -Step 3 -Total 6 -Title 'Install location'
-    while ($true) {
-        if (-not $InstallPath) {
-            $InstallPath = Read-PathPrompt -Message "Where should Eclipse be installed?" -DefaultPath $defaultPath
-        }
-
-        $existingRoot = Find-ExistingEclipse -InstallPath $InstallPath
-        if (-not $existingRoot) { break }
-
-        Write-Host ""
-        Write-Host "  An existing Eclipse installation was found at: $existingRoot" -ForegroundColor Yellow
-        if (-not (Read-YesNo -Message "  Add ADT and the chosen plugins to this existing installation?" -DefaultYes $true)) {
-            Write-Host "  Please choose a different folder." -ForegroundColor DarkGray
-            $InstallPath = $null
-            continue
-        }
-
-        $installedVersion = Resolve-EclipseVersionIdFromInstall -EclipseRoot $existingRoot -EclipseVersions $catalog.eclipseVersions
-        if ($installedVersion -ne $EclipseVersion) {
-            $foundLabel = if ($installedVersion) { $installedVersion } else { 'unknown' }
-            Write-Host "  The existing installation is Eclipse '$foundLabel', which does not match the selected '$EclipseVersion'." -ForegroundColor Red
-            if (-not (Read-YesNo -Message "  Choose a different folder? (answering no cancels the installation)" -DefaultYes $true)) {
-                Write-Log "Existing Eclipse at '$existingRoot' is version '$foundLabel' but '$EclipseVersion' was requested. Installation cancelled by user." -Level WARN
-                return
-            }
-            $InstallPath = $null
-            continue
-        }
-
-        if (-not (Test-ExistingEclipseBasePackage -EclipseRoot $existingRoot -BasePackageEntry $basePackageEntry)) {
-            Write-Host "  The existing installation does not match the selected base package '$($basePackageEntry.name)'." -ForegroundColor Red
-            if (-not (Read-YesNo -Message "  Choose a different folder? (answering no cancels the installation)" -DefaultYes $true)) {
-                Write-Log "Existing Eclipse at '$existingRoot' does not match the requested base package '$BasePackage'. Installation cancelled by user." -Level WARN
-                return
-            }
-            $InstallPath = $null
-            continue
-        }
-
-        Write-Host "  Version and base package match ($EclipseVersion, $($basePackageEntry.name)) - ADT and plugins will be added to this installation." -ForegroundColor Green
-        $reuseExistingEclipseRoot = $existingRoot
-        break
-    }
-}
-Write-Log "Install path: $InstallPath" -Level INFO
-Write-Log "Reuse existing Eclipse root: $reuseExistingEclipseRoot" -Level DEBUG
+$installLocation = Resolve-InstallLocation -Catalog $catalog -BasePackageEntry $basePackageEntry -EclipseVersion $EclipseVersion -InstallPath $InstallPath -NonInteractive:$NonInteractive
+if (-not $installLocation) { exit 0 }
+$InstallPath = $installLocation.InstallPath
+$reuseExistingEclipseRoot = $installLocation.ReuseExistingEclipseRoot
 
 # --- Step 4: plugin selection -------------------------------------------------
-$selectedPlugins = @()
-if ($NonInteractive) {
-    if ($Features) {
-        foreach ($featureId in $Features) {
-            $plugin = $catalog.plugins | Where-Object { $_.id -eq $featureId }
-            if (-not $plugin) { throw "Unknown feature id '$featureId'. Run with -ListFeatures to see valid values." }
-            $selectedPlugins += $plugin
-        }
-    }
-} else {
-    Write-StepHeader -Step 4 -Total 6 -Title 'Additional plugins'
-    $selectedPlugins = Read-MultiSelect -Title "Select additional plugins to install (ADT itself is always installed):" `
-        -Options $catalog.plugins -LabelProperty 'name' -DescriptionProperty 'description' -GroupProperty 'category'
-}
-Write-Log "Selected plugins: $(($selectedPlugins.id) -join ', ')" -Level DEBUG
-
-$selectedDevEpos = @($selectedPlugins | Where-Object { $_.category -eq 'devepos' })
-# Note: name must differ from the $DevEposChannel parameter - variable names are
-# case-insensitive and its ValidateSet would reject assigning $null.
-$activeDevEposChannel = $null
-if ($selectedDevEpos.Count -gt 0) {
-    if (-not $catalog.devepos -or -not $catalog.devepos.channels) {
-        throw 'catalog.json does not define DevEpos channels.'
-    }
-
-    $channelId = $DevEposChannel
-    if (-not $NonInteractive) {
-        $channelOptions = @($catalog.devepos.channels)
-        $defaultChannelIndex = [Math]::Max(0, [Array]::IndexOf(@($channelOptions.id), 'latest'))
-        $selectedChannel = Read-MenuChoice -Title 'Select the DevEpos channel for all selected DevEpos plugins:' `
-            -Options $channelOptions -LabelProperty 'label' -DefaultIndex $defaultChannelIndex
-        if ($selectedChannel -and $selectedChannel.id) { $channelId = [string]$selectedChannel.id }
-    }
-
-    $activeDevEposChannel = $catalog.devepos.channels | Where-Object { $_.id -eq $channelId }
-    if (-not $activeDevEposChannel) {
-        throw "Unknown DevEpos channel '$channelId'. Valid values: $($catalog.devepos.channels.id -join ', ')."
-    }
-    Write-Log "DevEpos channel: $($activeDevEposChannel.id)" -Level INFO
-}
+$selectedPlugins = Resolve-PluginSelection -Catalog $catalog -Features $Features -NonInteractive:$NonInteractive
+$activeDevEposChannel = Resolve-DevEposChannel -Catalog $catalog -SelectedPlugins $selectedPlugins -DevEposChannel $DevEposChannel -NonInteractive:$NonInteractive
 
 # --- Step 5: confirmation -----------------------------------------------------
 if (-not $NonInteractive) {
-    Write-StepHeader -Step 5 -Total 6 -Title 'Confirmation'
-    $plannedEclipseRoot = if ($reuseExistingEclipseRoot) { $reuseExistingEclipseRoot } else { Resolve-EclipseInstallRoot -InstallPath $InstallPath }
-    Write-Host "  Eclipse version : $EclipseVersion"
-    Write-Host "  Install path    : $plannedEclipseRoot"
-    if ($reuseExistingEclipseRoot) {
-        Write-Host "  Mode            : add to existing installation"
-    }
-    Write-Host "  Base package    : $($basePackageEntry.name)"
-    Write-Host "  ADT             : $($catalog.adt.name) (always installed)"
-    if ($activeDevEposChannel) {
-        Write-Host "  DevEpos channel : $($activeDevEposChannel.label)"
-    }
-    if ($selectedPlugins.Count -gt 0) {
-        Write-Host "  Extra plugins   :"
-        $selectedPlugins | ForEach-Object { Write-Host "    - $($_.name)" }
-    } else {
-        Write-Host "  Extra plugins   : (none selected)"
-    }
-    Write-Host ""
-    if (-not (Read-YesNo -Message "Proceed with download and installation?" -DefaultYes $true)) {
+    $confirmed = Show-InstallationSummary -Catalog $catalog -BasePackageEntry $basePackageEntry -EclipseVersion $EclipseVersion `
+        -InstallPath $InstallPath -ReuseExistingEclipseRoot $reuseExistingEclipseRoot `
+        -SelectedPlugins $selectedPlugins -ActiveDevEposChannel $activeDevEposChannel
+    if (-not $confirmed) {
         Write-Log "Aborted by user." -Level WARN
-        return
+        exit 0
     }
 }
 
-# --- Step 6: download & extract Eclipse --------------------------------------
+# --- Step 6: download, extract & install --------------------------------------
 if (-not $NonInteractive) {
     Write-StepHeader -Step 6 -Total 6 -Title 'Download & install'
 }
 
-if ($reuseExistingEclipseRoot) {
-    Write-Log "Reusing existing Eclipse installation at '$reuseExistingEclipseRoot' - skipping download and extraction." -Level INFO
-    $eclipseRoot = $reuseExistingEclipseRoot
-} else {
-    $resolvedDownload = Resolve-BasePackageDownload -BasePackageEntry $basePackageEntry -Version $EclipseVersion
+$installation = Resolve-EclipseInstallation -BasePackageEntry $basePackageEntry -EclipseVersion $EclipseVersion `
+    -InstallPath $InstallPath -ReuseExistingEclipseRoot $reuseExistingEclipseRoot -CacheDirectory $CacheDirectory
 
-    $zipPath = Get-CachedFile -Url $resolvedDownload.Url -FallbackUrl $resolvedDownload.FallbackUrl -CacheDirectory $CacheDirectory -FileName $resolvedDownload.ZipFileName
-    $eclipseRoot = Expand-EclipseZip -ZipPath $zipPath -InstallPath $InstallPath
-}
-$eclipseExe = Join-Path $eclipseRoot 'eclipsec.exe'
-Write-Log "Eclipse root: '$eclipseRoot', eclipsec.exe: '$eclipseExe'" -Level DEBUG
+$results = Install-AdtAndPlugins -Catalog $catalog -EclipseExePath $installation.EclipseExePath -EclipseRoot $installation.EclipseRoot `
+    -EclipseVersion $EclipseVersion -SelectedPlugins $selectedPlugins -ActiveDevEposChannel $activeDevEposChannel
 
-# --- Install ADT (+ required extra repos/IUs) --------------------------------
-$adtRepos = @((Expand-Template -Template $catalog.adt.repoUrlTemplate -Version $EclipseVersion))
-if ($catalog.adt.additionalRepoUrlTemplates) {
-    foreach ($tmpl in $catalog.adt.additionalRepoUrlTemplates) {
-        $adtRepos += (Expand-Template -Template $tmpl -Version $EclipseVersion)
-    }
-}
-Write-Log "ADT repositories: $($adtRepos -join ', ')" -Level DEBUG
-
-$results = @()
-Write-Log "ADT installable units: $($catalog.adt.installableUnits -join ', ')" -Level DEBUG
-$adtResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories $adtRepos `
-    -InstallIUs $catalog.adt.installableUnits -DestinationPath $eclipseRoot `
-    -Description $catalog.adt.name
-$results += [PSCustomObject]@{ Name = $catalog.adt.name; Success = $adtResult.Success }
-
-if (-not $adtResult.Success) {
-    Write-Log "ADT installation failed - skipping additional plugins since they depend on ADT." -Level ERROR
-} else {
-    # --- Install selected plugins --------------------------------------------
-    # Third-party plugins commonly depend on bundles (e.g. org.eclipse.lsp4e,
-    # com.ibm.icu) that ship with the full EPP packages (java/rcp) but are
-    # absent from the minimal 'platform' base package. Always pairing the
-    # plugin's own repo with the matching Eclipse release train repo lets p2
-    # resolve those transitive dependencies regardless of the base package.
-    $releaseTrainRepo = Expand-Template -Template 'https://download.eclipse.org/releases/{version}' -Version $EclipseVersion
-
-    if ($selectedDevEpos.Count -gt 0) {
-        $deveposIUs = @($selectedDevEpos | ForEach-Object { $_.installableUnits })
-        Write-Log "DevEpos installable units: $($deveposIUs -join ', ')" -Level DEBUG
-        $deveposResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($activeDevEposChannel.repoUrl, $releaseTrainRepo) `
-            -InstallIUs $deveposIUs -DestinationPath $eclipseRoot `
-            -Description "DevEpos ($($activeDevEposChannel.id) channel)"
-        foreach ($plugin in $selectedDevEpos) {
-            $results += [PSCustomObject]@{ Name = $plugin.name; Success = $deveposResult.Success }
-        }
-    }
-
-    foreach ($plugin in @($selectedPlugins | Where-Object { $_.category -ne 'devepos' })) {
-        $pluginIUs = @($plugin.installableUnits)
-        if ($plugin.requiresTerminal -and $catalog.terminalFeature) {
-            # Eclipse renamed its Terminal feature starting with the 2025-09 train (see
-            # catalog.json's 'terminalFeature' entry); pick the id matching this version so
-            # plugins like GitHub Copilot (whose terminal tool needs it) resolve correctly,
-            # since it's absent from the minimal 'platform' base package.
-            $terminalIU = if ($EclipseVersion -ge $catalog.terminalFeature.firstVersionWithNewFeature) {
-                $catalog.terminalFeature.installableUnit
-            } else {
-                $catalog.terminalFeature.legacyInstallableUnit
-            }
-            $pluginIUs += $terminalIU
-        }
-        Write-Log "Plugin '$($plugin.name)' installable units: $($pluginIUs -join ', ')" -Level DEBUG
-        $pluginResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($plugin.repoUrl, $releaseTrainRepo) `
-            -InstallIUs $pluginIUs -DestinationPath $eclipseRoot `
-            -Description $plugin.name
-        $results += [PSCustomObject]@{ Name = $plugin.name; Success = $pluginResult.Success }
-    }
-}
-
-# --- Summary -------------------------------------------------------------------
-Write-Host ""
-Write-Host ("── Installation Summary " + ('─' * 24)) -ForegroundColor Cyan
-$anyFailed = $false
-foreach ($r in $results) {
-    if ($r.Success) {
-        Write-Host "  [OK]   $($r.Name)" -ForegroundColor Green
-    } else {
-        Write-Host "  [FAIL] $($r.Name)" -ForegroundColor Red
-        $anyFailed = $true
-    }
-}
-Write-Host ""
-
-if ($anyFailed) {
-    Write-Log "Completed with failures. See log for details." -Level ERROR
-    Show-DesktopNotification -Title 'eclipsADT-o-Mat' -Message 'Installation completed with failures. See the log for details.' -Icon Error
-    exit 1
-}
-
-Write-Log "All done. Launch Eclipse from: $eclipseRoot\eclipse.exe" -Level SUCCESS
-Write-Host "Eclipse with ADT is ready at: $eclipseRoot\eclipse.exe" -ForegroundColor Green
-Show-DesktopNotification -Title 'eclipsADT-o-Mat' -Message "Installation finished. Launch Eclipse from: $eclipseRoot\eclipse.exe"
-exit 0
+Show-ResultsSummary -Results $results -EclipseRoot $installation.EclipseRoot

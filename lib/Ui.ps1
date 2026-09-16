@@ -10,11 +10,12 @@
 #>
 
 $script:UiTheme = @{
-    Accent = 'Cyan'
-    Muted  = 'DarkGray'
-    Ok     = 'Green'
-    Warn   = 'Yellow'
-    Err    = 'Red'
+    Accent   = 'Cyan'
+    Muted    = 'DarkGray'
+    Ok       = 'Green'
+    Warn     = 'Yellow'
+    Err      = 'Red'
+    Category = 'Magenta'
 }
 
 $script:UiInteractive = $null

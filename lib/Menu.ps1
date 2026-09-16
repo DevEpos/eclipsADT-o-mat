@@ -25,6 +25,52 @@ function Get-MenuPageSize {
     try { return [Math]::Max(1, [Console]::WindowHeight - 3 - $ReservedLines) } catch { return 10 }
 }
 
+function Write-MenuLine {
+    # Clears the current line (so redraws don't leave stale trailing characters) before writing it.
+    param([Parameter(Mandatory)] [string]$Text, [string]$ForegroundColor)
+    $line = ([char]27) + '[2K' + (Limit-UiLine $Text)
+    if ($ForegroundColor) { Write-Host $line -ForegroundColor $ForegroundColor } else { Write-Host $line }
+}
+
+function Write-MenuHeaderLines {
+    param([Parameter(Mandatory)] [string]$Title, [Parameter(Mandatory)] [string]$Hint)
+    Write-MenuLine -Text $Title -ForegroundColor Cyan
+    Write-MenuLine -Text $Hint -ForegroundColor DarkGray
+}
+
+function Get-MenuPageLayout {
+    <#
+    .SYNOPSIS
+        Splits an ordered array of display "blocks" (each an ordered list of
+        display lines) into pages of at most $PageSize total lines, without
+        ever splitting a block across two pages.
+    .OUTPUTS
+        [PSCustomObject]@{ Pages = <list of block lists>; PageOfBlock = <int[] mapping each block's index to its page index> }
+    #>
+    param(
+        [Parameter(Mandatory)] [System.Collections.Generic.List[object]]$Blocks,
+        [Parameter(Mandatory)] [int]$PageSize
+    )
+
+    $pages = [System.Collections.Generic.List[object]]::new()
+    $pageOfBlock = New-Object int[] $Blocks.Count
+    $page = [System.Collections.Generic.List[object]]::new()
+    $pageLines = 0
+    for ($i = 0; $i -lt $Blocks.Count; $i++) {
+        if ($page.Count -gt 0 -and ($pageLines + $Blocks[$i].Count) -gt $PageSize) {
+            $pages.Add($page)
+            $page = [System.Collections.Generic.List[object]]::new()
+            $pageLines = 0
+        }
+        $page.Add($Blocks[$i])
+        $pageOfBlock[$i] = $pages.Count
+        $pageLines += $Blocks[$i].Count
+    }
+    if ($page.Count -gt 0) { $pages.Add($page) }
+
+    return [PSCustomObject]@{ Pages = $pages; PageOfBlock = $pageOfBlock }
+}
+
 function Read-MenuChoice {
     <#
     .SYNOPSIS
@@ -76,43 +122,48 @@ function Read-MenuChoiceInteractive {
         [int]$DefaultIndex = 0
     )
 
-    $esc = [char]27
     $current = [Math]::Min([Math]::Max(0, $DefaultIndex), $Options.Count - 1)
     $bannerHeight = Get-PinnedBannerHeight
+    # One single-line block per option; reused by Get-MenuPageLayout below.
+    $blocks = [System.Collections.Generic.List[object]]::new()
+    for ($i = 0; $i -lt $Options.Count; $i++) { $blocks.Add(@(@{ Kind = 'Option'; Index = $i })) }
 
     [Console]::CursorVisible = $false
     Clear-Host
     Write-PinnedBanner
     try {
         while ($true) {
+            # Re-page on every draw so window resizes are picked up.
             $pageSize = Get-MenuPageSize -ReservedLines $bannerHeight
-            $pageCount = [int][Math]::Ceiling($Options.Count / $pageSize)
-            $page = [int][Math]::Floor($current / $pageSize)
-            $start = $page * $pageSize
-            $end = [Math]::Min($start + $pageSize, $Options.Count) - 1
+            $layout = Get-MenuPageLayout -Blocks $blocks -PageSize $pageSize
+            $pages = $layout.Pages
+            $pageOfOption = $layout.PageOfBlock
+            $pageIndex = $pageOfOption[$current]
 
             [Console]::SetCursorPosition(0, $bannerHeight)
-            Write-Host ("$esc[2K" + (Limit-UiLine $Title)) -ForegroundColor Cyan
             $hint = "  Up/Down move · Enter select · 1-9 jump"
-            if ($pageCount -gt 1) { $hint += " · PgUp/PgDn page $($page + 1)/$pageCount" }
-            Write-Host ("$esc[2K" + (Limit-UiLine $hint)) -ForegroundColor DarkGray
+            if ($pages.Count -gt 1) { $hint += " · PgUp/PgDn page $($pageIndex + 1)/$($pages.Count)" }
+            Write-MenuHeaderLines -Title $Title -Hint $hint
 
-            for ($i = $start; $i -le $end; $i++) {
-                $label = Get-MenuOptionLabel -Option $Options[$i] -LabelProperty $LabelProperty
-                if ($i -eq $current) {
-                    Write-Host ("$esc[2K" + (Limit-UiLine ("  > {0}" -f $label))) -ForegroundColor Cyan
-                } else {
-                    Write-Host ("$esc[2K" + (Limit-UiLine ("    {0}" -f $label)))
+            foreach ($block in $pages[$pageIndex]) {
+                foreach ($line in $block) {
+                    $i = $line.Index
+                    $label = Get-MenuOptionLabel -Option $Options[$i] -LabelProperty $LabelProperty
+                    if ($i -eq $current) {
+                        Write-MenuLine -Text ("  > {0}" -f $label) -ForegroundColor Cyan
+                    } else {
+                        Write-MenuLine -Text ("    {0}" -f $label)
+                    }
                 }
             }
-            [Console]::Write("$esc[0J")
+            [Console]::Write("$([char]27)[0J")
 
             $key = [Console]::ReadKey($true)
             switch ($key.Key) {
                 'UpArrow'   { $current = ($current - 1 + $Options.Count) % $Options.Count }
                 'DownArrow' { $current = ($current + 1) % $Options.Count }
-                'PageUp'    { $current = [Math]::Max(0, $current - $pageSize) }
-                'PageDown'  { $current = [Math]::Min($Options.Count - 1, $current + $pageSize) }
+                'PageUp'    { $current = [Array]::IndexOf($pageOfOption, [int][Math]::Max(0, $pageIndex - 1)) }
+                'PageDown'  { $current = [Array]::IndexOf($pageOfOption, [int][Math]::Min($pages.Count - 1, $pageIndex + 1)) }
                 'Home'      { $current = 0 }
                 'End'       { $current = $Options.Count - 1 }
                 'Enter'     { return $Options[$current] }
@@ -240,14 +291,13 @@ function Read-MultiSelectInteractive {
         [int[]]$LockedIndices = @()
     )
 
-    $esc = [char]27
     $selected = New-Object bool[] $Options.Count
     foreach ($i in $PreSelectedIndices) { $selected[$i] = $true }
     foreach ($i in $LockedIndices) { $selected[$i] = $true }
 
     # One display block per option: optional group header, the option line and
     # its optional description line. Blocks are never split across pages.
-    $blocks = @()
+    $blocks = [System.Collections.Generic.List[object]]::new()
     $lastGroup = $null
     for ($i = 0; $i -lt $Options.Count; $i++) {
         $lines = [System.Collections.Generic.List[object]]::new()
@@ -262,7 +312,7 @@ function Read-MultiSelectInteractive {
         if ($DescriptionProperty -and $Options[$i].$DescriptionProperty) {
             $lines.Add(@{ Kind = 'Description'; Index = $i })
         }
-        $blocks += , $lines
+        $blocks.Add($lines)
     }
 
     $current = 0
@@ -275,34 +325,21 @@ function Read-MultiSelectInteractive {
         while ($true) {
             # Re-page on every draw so window resizes are picked up.
             $pageSize = Get-MenuPageSize -ReservedLines $bannerHeight
-            $pages = [System.Collections.Generic.List[object]]::new()
-            $pageOfOption = New-Object int[] $Options.Count
-            $page = [System.Collections.Generic.List[object]]::new()
-            $pageLines = 0
-            for ($i = 0; $i -lt $blocks.Count; $i++) {
-                if ($page.Count -gt 0 -and ($pageLines + $blocks[$i].Count) -gt $pageSize) {
-                    $pages.Add($page)
-                    $page = [System.Collections.Generic.List[object]]::new()
-                    $pageLines = 0
-                }
-                $page.Add($blocks[$i])
-                $pageOfOption[$i] = $pages.Count
-                $pageLines += $blocks[$i].Count
-            }
-            if ($page.Count -gt 0) { $pages.Add($page) }
+            $layout = Get-MenuPageLayout -Blocks $blocks -PageSize $pageSize
+            $pages = $layout.Pages
+            $pageOfOption = $layout.PageOfBlock
             $pageIndex = $pageOfOption[$current]
 
             [Console]::SetCursorPosition(0, $bannerHeight)
-            Write-Host ("$esc[2K" + (Limit-UiLine $Title)) -ForegroundColor Cyan
             $hint = "  Up/Down move · Space toggle · a all · n none · Enter confirm"
             if ($pages.Count -gt 1) { $hint += " · PgUp/PgDn page $($pageIndex + 1)/$($pages.Count)" }
-            Write-Host ("$esc[2K" + (Limit-UiLine $hint)) -ForegroundColor DarkGray
+            Write-MenuHeaderLines -Title $Title -Hint $hint
 
             foreach ($block in $pages[$pageIndex]) {
                 foreach ($line in $block) {
                     switch ($line.Kind) {
                         'Header' {
-                            Write-Host ("$esc[2K" + (Limit-UiLine ("  {0}" -f $line.Text))) -ForegroundColor DarkGray
+                            Write-MenuLine -Text ("  {0}" -f $line.Text) -ForegroundColor $script:UiTheme.Category
                         }
                         'Option' {
                             $i = $line.Index
@@ -310,20 +347,20 @@ function Read-MultiSelectInteractive {
                             $check = if ($selected[$i]) { 'x' } else { ' ' }
                             $lockTag = if ($LockedIndices -contains $i) { ' (required)' } else { '' }
                             $pointer = if ($i -eq $current) { '>' } else { ' ' }
-                            $text = "$esc[2K" + (Limit-UiLine ("  {0} [{1}] {2}{3}" -f $pointer, $check, $label, $lockTag))
+                            $text = "  {0} [{1}] {2}{3}" -f $pointer, $check, $label, $lockTag
                             if ($i -eq $current) {
-                                Write-Host $text -ForegroundColor Cyan
+                                Write-MenuLine -Text $text -ForegroundColor Cyan
                             } else {
-                                Write-Host $text
+                                Write-MenuLine -Text $text
                             }
                         }
                         'Description' {
-                            Write-Host ("$esc[2K" + (Limit-UiLine ("        {0}" -f $Options[$line.Index].$DescriptionProperty))) -ForegroundColor DarkGray
+                            Write-MenuLine -Text ("        {0}" -f $Options[$line.Index].$DescriptionProperty) -ForegroundColor DarkGray
                         }
                     }
                 }
             }
-            [Console]::Write("$esc[0J")
+            [Console]::Write("$([char]27)[0J")
 
             $key = [Console]::ReadKey($true)
             switch ($key.Key) {
@@ -394,7 +431,15 @@ function Read-MultiSelectClassic {
     while ($true) {
         Write-Host ""
         Write-Host $Title -ForegroundColor Cyan
+        $lastGroup = $null
         for ($i = 0; $i -lt $Options.Count; $i++) {
+            if ($GroupProperty) {
+                $group = [string]$Options[$i].$GroupProperty
+                if ($group -ne $lastGroup) {
+                    Write-Host ("  {0}" -f $group) -ForegroundColor $script:UiTheme.Category
+                    $lastGroup = $group
+                }
+            }
             $label = Get-MenuOptionLabel -Option $Options[$i] -LabelProperty $LabelProperty
             $check = if ($selected[$i]) { 'x' } else { ' ' }
             $lockTag = if ($LockedIndices -contains $i) { ' (required)' } else { '' }
@@ -449,9 +494,10 @@ function Read-PathPrompt {
     )
 
     while ($true) {
+        $browseStartPath = [Environment]::GetFolderPath('MyDocuments')
         Write-Host ""
         Write-Host -NoNewline "$Message "
-        Write-Host -NoNewline "[Enter = default, B = browse: $DefaultPath]" -ForegroundColor DarkGray
+        Write-Host -NoNewline "[Enter = default, B = browse: $browseStartPath]" -ForegroundColor DarkGray
         Write-Host -NoNewline ": "
         $answer = [Console]::ReadLine()
         if ([string]::IsNullOrWhiteSpace($answer)) { return $DefaultPath }
@@ -459,7 +505,7 @@ function Read-PathPrompt {
             Add-Type -AssemblyName System.Windows.Forms
             $dialog = [System.Windows.Forms.FolderBrowserDialog]::new()
             $dialog.Description = $Message
-            $dialog.SelectedPath = $DefaultPath
+            $dialog.SelectedPath = $browseStartPath
             $dialog.ShowNewFolderButton = $true
             try {
                 if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {

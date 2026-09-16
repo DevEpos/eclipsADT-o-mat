@@ -55,6 +55,63 @@ function Get-EclipseP2Profile {
     return 'epp.package.java'
 }
 
+function Invoke-ProcessWithSpinnerCapture {
+    <#
+    .SYNOPSIS
+        Runs a process to completion, showing a console spinner that tails its
+        stdout, and returns its exit code plus all captured stdout/stderr lines.
+    #>
+    param(
+        [Parameter(Mandatory)] [string]$FilePath,
+        [Parameter(Mandatory)] [string[]]$ArgumentList,
+        [Parameter(Mandatory)] [string]$SpinnerActivity
+    )
+
+    # Redirect output to temp files so the spinner can tail progress while the process runs.
+    $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("adt-bundler-p2-" + [Guid]::NewGuid().ToString('N'))
+    $stdoutFile = "$tempBase.out.log"
+    $stderrFile = "$tempBase.err.log"
+
+    $spinner = Start-ConsoleSpinner -Activity $SpinnerActivity
+    try {
+        $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -NoNewWindow -PassThru `
+            -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+        while (-not $proc.HasExited) {
+            $lastLine = Get-Content -LiteralPath $stdoutFile -Tail 1 -ErrorAction SilentlyContinue
+            Update-ConsoleSpinner -Spinner $spinner -Status ([string]$lastLine)
+            Start-Sleep -Milliseconds 150
+        }
+        $proc.WaitForExit()
+        $exitCode = $proc.ExitCode
+    } finally {
+        Stop-ConsoleSpinner -Spinner $spinner
+    }
+
+    $output = @()
+    foreach ($file in @($stdoutFile, $stderrFile)) {
+        if (Test-Path -LiteralPath $file) {
+            $output += @(Get-Content -LiteralPath $file -ErrorAction SilentlyContinue)
+            Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    return [PSCustomObject]@{ ExitCode = $exitCode; Output = $output }
+}
+
+function Select-EclipseDirectorErrorLines {
+    <#
+    .SYNOPSIS
+        Filters p2 director output down to the lines useful for diagnosing a
+        failure (missing requirements / failure summary), instead of the full
+        (often very verbose) director output.
+    #>
+    param([string[]]$Output)
+
+    return @($Output | Where-Object {
+        $_ -match 'Missing requirement|Cannot satisfy dependency|Installation failed|Cannot complete the install|^\s*From:|^\s*To:'
+    })
+}
+
 function Invoke-P2Director {
     <#
     .SYNOPSIS
@@ -139,33 +196,11 @@ function Invoke-P2Director {
     do {
         $attempt++
 
-        # Redirect output to temp files so a spinner can tail progress while eclipsec runs.
-        $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("adt-bundler-p2-" + [Guid]::NewGuid().ToString('N'))
-        $stdoutFile = "$tempBase.out.log"
-        $stderrFile = "$tempBase.err.log"
-
-        $spinner = Start-ConsoleSpinner -Activity "Installing $Description (attempt $attempt/$($RetryCount + 1))"
-        try {
-            $proc = Start-Process -FilePath $EclipseExePath -ArgumentList $directorArgs -NoNewWindow -PassThru `
-                -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
-            while (-not $proc.HasExited) {
-                $lastLine = Get-Content -LiteralPath $stdoutFile -Tail 1 -ErrorAction SilentlyContinue
-                Update-ConsoleSpinner -Spinner $spinner -Status ([string]$lastLine)
-                Start-Sleep -Milliseconds 150
-            }
-            $proc.WaitForExit()
-            $exitCode = $proc.ExitCode
-            Write-Log "Invoke-P2Director: attempt $attempt exited with code $exitCode" -Level DEBUG
-        } finally {
-            Stop-ConsoleSpinner -Spinner $spinner
-        }
-
-        foreach ($file in @($stdoutFile, $stderrFile)) {
-            if (Test-Path -LiteralPath $file) {
-                $output += @(Get-Content -LiteralPath $file -ErrorAction SilentlyContinue)
-                Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
-            }
-        }
+        $run = Invoke-ProcessWithSpinnerCapture -FilePath $EclipseExePath -ArgumentList $directorArgs `
+            -SpinnerActivity "Installing $Description (attempt $attempt/$($RetryCount + 1))"
+        $exitCode = $run.ExitCode
+        $output += $run.Output
+        Write-Log "Invoke-P2Director: attempt $attempt exited with code $exitCode" -Level DEBUG
 
         if ($exitCode -ne 0 -and $attempt -le $RetryCount) {
             Write-Log "Installation attempt $attempt failed for $Description (exit code $exitCode); retrying." -Level WARN
@@ -177,14 +212,8 @@ function Invoke-P2Director {
         return [PSCustomObject]@{ Success = $true; ExitCode = $exitCode; Output = $output }
     }
 
-    # Surface the most useful lines (missing requirements / failure summary)
-    # instead of the full (often very verbose) director output.
-    $relevantLines = $output | Where-Object {
-        $_ -match 'Missing requirement|Cannot satisfy dependency|Installation failed|Cannot complete the install|^\s*From:|^\s*To:'
-    }
-
     Write-Log "Installation FAILED: $Description (exit code $exitCode)" -Level ERROR
-    foreach ($line in $relevantLines) {
+    foreach ($line in (Select-EclipseDirectorErrorLines -Output $output)) {
         Write-Log "  $line" -Level ERROR
     }
 
