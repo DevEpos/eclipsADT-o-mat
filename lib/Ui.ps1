@@ -48,6 +48,8 @@ function Limit-UiLine {
     return $Text.Substring(0, $max - 1) + '…'
 }
 
+$script:UiPinnedBanner = $null
+
 function Write-Banner {
     param(
         [Parameter(Mandatory)]
@@ -55,6 +57,22 @@ function Write-Banner {
 
         [string]$Subtitle
     )
+
+    # Remembered so Write-PinnedBanner can redraw it above later menus.
+    $script:UiPinnedBanner = [PSCustomObject]@{ Title = $Title; Subtitle = $Subtitle }
+    Write-PinnedBanner
+}
+
+function Write-PinnedBanner {
+    <#
+    .SYNOPSIS
+        (Re)draws the banner previously set via Write-Banner. Used to keep
+        the intro screen pinned above menus after a Clear-Host. No-op if
+        Write-Banner hasn't been called.
+    #>
+    if (-not $script:UiPinnedBanner) { return }
+    $Title = $script:UiPinnedBanner.Title
+    $Subtitle = $script:UiPinnedBanner.Subtitle
 
     $inner = [Math]::Max($Title.Length, ($Subtitle ?? '').Length) + 6
     Write-Host ""
@@ -64,6 +82,14 @@ function Write-Banner {
         Write-Host ("║{0}║" -f $Subtitle.PadLeft(($inner + $Subtitle.Length) / 2).PadRight($inner)) -ForegroundColor $script:UiTheme.Muted
     }
     Write-Host ("╚{0}╝" -f ('═' * $inner)) -ForegroundColor $script:UiTheme.Accent
+}
+
+function Get-PinnedBannerHeight {
+    # Line count Write-PinnedBanner prints, so callers can offset cursor math.
+    if (-not $script:UiPinnedBanner) { return 0 }
+    $height = 4 # blank line + top border + title + bottom border
+    if ($script:UiPinnedBanner.Subtitle) { $height++ }
+    return $height
 }
 
 function Write-StepHeader {

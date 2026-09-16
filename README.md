@@ -41,35 +41,45 @@ and keeps the console window open after the run so errors and the log location
 remain visible.
 
 You'll be prompted for:
-1. The Eclipse release train to install (e.g. `2025-06`) - the latest
-   supported version is preselected.
-2. The install directory. Press `B` at this prompt to choose a folder in
+1. The base Eclipse package to install: "Eclipse IDE for Java Developers"
+   (default), "Eclipse IDE for RCP and RAP Developers" (for Eclipse
+   plug-in/PDE development), or "Eclipse Platform" (minimal core runtime
+   only, no language tooling - everything, including ADT, is added via p2
+   afterwards).
+2. The Eclipse release train to install (e.g. `2026-09`) - the latest
+   version supported by the chosen base package is preselected. Note that
+   the "Eclipse Platform" package is only available for a curated subset of
+   release trains (see `catalog.json`'s `basePackages[].downloads`).
+3. The install directory. Press `B` at this prompt to choose a folder in
   Windows Explorer, or type a path directly. If it already exists, Eclipse
   is placed in an `eclipse` subfolder; a new directory is used as the
   Eclipse root.
-3. Which additional plugins to install alongside ADT (multi-select: toggle a
+4. Which additional plugins to install alongside ADT (multi-select: toggle a
    number, `a` = all, `n` = none, Enter to confirm).
-4. Which DevEpos channel to use for all selected DevEpos plugins: `dev` or
+5. Which DevEpos channel to use for all selected DevEpos plugins: `dev` or
   `latest`.
 
-The wizard then downloads the matching "Eclipse IDE for Java Developers"
-package (cached locally so re-runs don't re-download), extracts it, and runs
-the Eclipse p2 director headlessly to install ADT and your chosen plugins.
+The wizard then downloads the matching base Eclipse package (cached locally
+so re-runs don't re-download it), extracts it, and runs the Eclipse p2
+director headlessly to install ADT and your chosen plugins.
 
 ### Unattended / scripted usage
 
 ```shell
-.\Setup-AdtEclipse.ps1 -NonInteractive -EclipseVersion 2025-06 `
+.\Setup-AdtEclipse.ps1 -NonInteractive -BasePackage java -EclipseVersion 2026-09 `
     -InstallPath C:\dev\eclipse-adt `
     -Features devepos-search-tools,devepos-tags
 ```
+
+  Use `-BasePackage rcp` or `-BasePackage platform` to install onto a
+  different base package. Defaults to `java` when omitted.
 
   Use `-DevEposChannel dev` to install selected DevEpos plugins from the
   development channel. The default is `latest`, and one channel is always used
   for all selected DevEpos plugins.
 
-Use `-ListFeatures` to print all available Eclipse versions and plugin ids
-without installing anything:
+Use `-ListFeatures` to print all available base packages, Eclipse versions and
+plugin ids without installing anything:
 
 ```shell
 .\Setup-AdtEclipse.ps1 -ListFeatures
@@ -80,7 +90,8 @@ without installing anything:
 | Parameter          | Description                                                                 |
 |---------------------|-------------------------------------------------------------------------------|
 | `-InstallPath`      | Target directory. An `eclipse` subfolder is used only when the target already exists. Defaults to `.\eclipse-adt`. |
-| `-EclipseVersion`   | Eclipse release train id, e.g. `2025-06`. Required with `-NonInteractive`.   |
+| `-BasePackage`      | Base Eclipse package id from `catalog.json`: `java` (default), `rcp` or `platform`. |
+| `-EclipseVersion`   | Eclipse release train id, e.g. `2026-09`. Required with `-NonInteractive`. Must be supported by `-BasePackage`. |
 | `-Features`         | Array of plugin ids from `catalog.json` to install (non-interactive mode only). |
 | `-DevEposChannel`   | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`). |
 | `-NonInteractive`   | Suppresses all prompts.                                                      |
@@ -93,8 +104,9 @@ without installing anything:
 installer/
   Setup-AdtEclipse.ps1   # main wizard entry point (interactive + unattended)
   Start-AdtEclipse.cmd   # Explorer-friendly launcher for the interactive wizard
-  catalog.json            # data-driven catalog: Eclipse versions, ADT repo(s)
-                           # + installable units, DevEpos channels/plugins + third-party plugins
+  catalog.json            # data-driven catalog: base packages, Eclipse versions,
+                           # ADT repo(s) + installable units, DevEpos channels/plugins
+                           # + third-party plugins
   lib/
     Download.ps1           # cache-aware download + Eclipse zip extraction
     P2Director.ps1          # wrapper around eclipsec.exe's p2 director
@@ -114,7 +126,10 @@ eclipsec.exe -application org.eclipse.equinox.p2.director ^
 
 - `epp.package.java` is the p2 profile id used by "Eclipse IDE for Java
   Developers" downloads (confirmed via the extracted install's `config.ini`
-  and `p2/.../profileRegistry` folder name).
+  and `p2/.../profileRegistry` folder name). Other base packages use their
+  own profile id (e.g. `epp.package.rcp`); `Invoke-P2Director` auto-detects
+  the correct profile from the extracted install, so no per-package script
+  changes are needed.
 - ADT's p2 repo (`https://tools.hana.ondemand.com/<version>`) **must** be
   paired with the matching Eclipse release train - mixing versions causes
   core platform bundle version-range failures.
@@ -132,7 +147,7 @@ eclipsec.exe -application org.eclipse.equinox.p2.director ^
   `additionalRepoUrlTemplates` and the extra entries in `installableUnits`).
 
 This was all verified end-to-end against real Eclipse/ADT release pairs
-(2023-09, 2024-12, 2025-06): full ADT install and a DevEpos feature both
+(2023-09, 2024-12, 2026-09): full ADT install and a DevEpos feature both
 install successfully into a fresh "Eclipse IDE for Java Developers"
 download with no manual repository configuration beyond what's already in
 `catalog.json`.
@@ -140,10 +155,25 @@ download with no manual repository configuration beyond what's already in
 ## Extending the catalog
 
 `catalog.json` is fully data-driven - no script changes are needed to add a
-new Eclipse release train or a new plugin.
+new Eclipse release train, base package or plugin.
 
-- **New Eclipse version**: add an entry to `eclipseVersions`. The download
-  URL is built from `eclipseDownload.urlTemplate` with `{version}` replaced.
+- **New Eclipse version**: add an entry to `eclipseVersions`. For
+  template-based base packages (`java`, `rcp`), the download URL is built
+  from that package's `urlTemplate` with `{version}` replaced - nothing else
+  to do. The `platform` package instead uses a `downloads` map keyed by the
+  version id, because its zip filenames embed a build-specific timestamp
+  (e.g. `R-4.36-202505281830`) that can't be derived from `{version}` alone;
+  find the matching build under
+  [download.eclipse.org/eclipse/downloads/drops4](https://download.eclipse.org/eclipse/downloads/drops4/)
+  (or its [archive](https://archive.eclipse.org/eclipse/downloads/drops4/)),
+  then add its "Platform Runtime Binary" Windows x86_64 zip URL (plus an
+  `archive.eclipse.org` fallback) to `platform.downloads` for the new version
+  id. If no entry is added, the `platform` package simply won't offer that
+  version.
+- **New base package**: add an entry to `basePackages` with `id`, `name`,
+  `description`, and either `urlTemplate`/`fallbackUrlTemplate` (if the
+  package follows the EPP release naming pattern) or a `downloads` map (for
+  packages needing per-version URLs).
 - **New plugin**: add an entry to `plugins` with `id`, `name`, `description`,
   `category`, `repoUrl` (the plugin's p2 update site) and `installableUnits`
   (the feature group id(s) to install, e.g. `com.example.foo.feature.group`).

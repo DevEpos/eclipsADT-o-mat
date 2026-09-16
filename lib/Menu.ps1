@@ -20,8 +20,9 @@ function Get-MenuOptionLabel {
 }
 
 function Get-MenuPageSize {
-    # Lines available for menu rows below the title and hint lines.
-    try { return [Math]::Max(1, [Console]::WindowHeight - 3) } catch { return 10 }
+    # Lines available for menu rows below the pinned banner, title and hint lines.
+    param([int]$ReservedLines = 0)
+    try { return [Math]::Max(1, [Console]::WindowHeight - 3 - $ReservedLines) } catch { return 10 }
 }
 
 function Read-MenuChoice {
@@ -75,18 +76,20 @@ function Read-MenuChoiceInteractive {
 
     $esc = [char]27
     $current = [Math]::Min([Math]::Max(0, $DefaultIndex), $Options.Count - 1)
+    $bannerHeight = Get-PinnedBannerHeight
 
     [Console]::CursorVisible = $false
     Clear-Host
+    Write-PinnedBanner
     try {
         while ($true) {
-            $pageSize = Get-MenuPageSize
+            $pageSize = Get-MenuPageSize -ReservedLines $bannerHeight
             $pageCount = [int][Math]::Ceiling($Options.Count / $pageSize)
             $page = [int][Math]::Floor($current / $pageSize)
             $start = $page * $pageSize
             $end = [Math]::Min($start + $pageSize, $Options.Count) - 1
 
-            [Console]::SetCursorPosition(0, 0)
+            [Console]::SetCursorPosition(0, $bannerHeight)
             Write-Host ("$esc[2K" + (Limit-UiLine $Title)) -ForegroundColor Cyan
             $hint = "  Up/Down move · Enter select · 1-9 jump"
             if ($pageCount -gt 1) { $hint += " · PgUp/PgDn page $($page + 1)/$pageCount" }
@@ -121,6 +124,7 @@ function Read-MenuChoiceInteractive {
         }
     } finally {
         Clear-Host
+        Write-PinnedBanner
         [Console]::CursorVisible = $true
     }
 }
@@ -258,13 +262,15 @@ function Read-MultiSelectInteractive {
     }
 
     $current = 0
+    $bannerHeight = Get-PinnedBannerHeight
 
     [Console]::CursorVisible = $false
     Clear-Host
+    Write-PinnedBanner
     try {
         while ($true) {
             # Re-page on every draw so window resizes are picked up.
-            $pageSize = Get-MenuPageSize
+            $pageSize = Get-MenuPageSize -ReservedLines $bannerHeight
             $pages = [System.Collections.Generic.List[object]]::new()
             $pageOfOption = New-Object int[] $Options.Count
             $page = [System.Collections.Generic.List[object]]::new()
@@ -282,7 +288,7 @@ function Read-MultiSelectInteractive {
             if ($page.Count -gt 0) { $pages.Add($page) }
             $pageIndex = $pageOfOption[$current]
 
-            [Console]::SetCursorPosition(0, 0)
+            [Console]::SetCursorPosition(0, $bannerHeight)
             Write-Host ("$esc[2K" + (Limit-UiLine $Title)) -ForegroundColor Cyan
             $hint = "  Up/Down move · Space toggle · a all · n none · Enter confirm"
             if ($pages.Count -gt 1) { $hint += " · PgUp/PgDn page $($pageIndex + 1)/$($pages.Count)" }
@@ -353,6 +359,7 @@ function Read-MultiSelectInteractive {
         }
     } finally {
         Clear-Host
+        Write-PinnedBanner
         [Console]::CursorVisible = $true
     }
 }
