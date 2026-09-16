@@ -31,7 +31,7 @@ function Write-Log {
         [Parameter(Mandatory, Position = 0)]
         [string]$Message,
 
-        [ValidateSet('INFO', 'WARN', 'ERROR', 'SUCCESS')]
+        [ValidateSet('INFO', 'WARN', 'ERROR', 'SUCCESS', 'DEBUG')]
         [string]$Level = 'INFO'
     )
 
@@ -41,6 +41,8 @@ function Write-Log {
         'WARN' { Write-Host $line -ForegroundColor Yellow }
         'ERROR' { Write-Host $line -ForegroundColor Red }
         'SUCCESS' { Write-Host $line -ForegroundColor Green }
+        # DEBUG is log-file only, never written to the console.
+        'DEBUG' { }
         default { Write-Host $line }
     }
 

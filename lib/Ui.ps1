@@ -33,6 +33,7 @@ function Test-InteractiveConsole {
     } catch {
         $script:UiInteractive = $false
     }
+    Write-Log "Test-InteractiveConsole: $script:UiInteractive" -Level DEBUG
     return $script:UiInteractive
 }
 

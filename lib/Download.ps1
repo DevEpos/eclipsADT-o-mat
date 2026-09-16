@@ -52,10 +52,14 @@ function Find-ExistingEclipse {
     param([Parameter(Mandatory)] [string]$InstallPath)
 
     foreach ($candidate in @($InstallPath, (Join-Path $InstallPath 'eclipse'))) {
+        Write-Log "Find-ExistingEclipse: checking '$candidate'" -Level DEBUG
         if (Test-Path -LiteralPath (Join-Path $candidate 'eclipse.exe')) {
-            return (Resolve-Path -LiteralPath $candidate).Path
+            $resolved = (Resolve-Path -LiteralPath $candidate).Path
+            Write-Log "Find-ExistingEclipse: found existing installation at '$resolved'" -Level DEBUG
+            return $resolved
         }
     }
+    Write-Log "Find-ExistingEclipse: no existing installation found under '$InstallPath'" -Level DEBUG
     return $null
 }
 
@@ -104,13 +108,16 @@ function Resolve-EclipseVersionIdFromInstall {
     )
 
     $platformVersion = Get-InstalledEclipsePlatformVersion -EclipseRoot $EclipseRoot
+    Write-Log "Resolve-EclipseVersionIdFromInstall: detected platform version '$platformVersion' at '$EclipseRoot'" -Level DEBUG
     if (-not $platformVersion) { return $null }
 
     foreach ($version in $EclipseVersions) {
         if ($version.label -match "\($([regex]::Escape($platformVersion))\)") {
+            Write-Log "Resolve-EclipseVersionIdFromInstall: matched catalog version '$($version.id)'" -Level DEBUG
             return $version.id
         }
     }
+    Write-Log "Resolve-EclipseVersionIdFromInstall: no catalog version matched platform version '$platformVersion'" -Level DEBUG
     return $null
 }
 
@@ -139,6 +146,7 @@ function Save-FileWithProgress {
         $response = $client.GetAsync($Url, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
         [void]$response.EnsureSuccessStatusCode()
         $totalBytes = $response.Content.Headers.ContentLength
+        Write-Log "Save-FileWithProgress: HTTP $([int]$response.StatusCode), content length $totalBytes bytes" -Level DEBUG
 
         $inStream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
         $outStream = [System.IO.File]::Create($Destination)
@@ -193,6 +201,7 @@ function Get-CachedFile {
     }
 
     $destination = Join-Path $CacheDirectory $FileName
+    Write-Log "Get-CachedFile: cache destination '$destination'" -Level DEBUG
 
     if (Test-Path -LiteralPath $destination) {
         if ((Get-Item -LiteralPath $destination).Length -gt 0 -and (Test-ZipFile -Path $destination)) {
@@ -205,6 +214,7 @@ function Get-CachedFile {
 
     $urlsToTry = @($Url)
     if ($FallbackUrl) { $urlsToTry += $FallbackUrl }
+    Write-Log "Get-CachedFile: URLs to try: $($urlsToTry -join ', ')" -Level DEBUG
 
     $tempDestination = "$destination.part"
 
@@ -263,6 +273,7 @@ function Expand-EclipseZip {
     try {
         $entries = $zip.Entries
         $total = $entries.Count
+        Write-Log "Expand-EclipseZip: $total entries to extract into '$destRoot'" -Level DEBUG
         $done = 0
         foreach ($entry in $entries) {
             $done++

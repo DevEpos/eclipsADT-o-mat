@@ -97,6 +97,7 @@ if (-not (Test-Path -LiteralPath $catalogPath)) {
     throw "catalog.json not found at '$catalogPath'."
 }
 $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json
+Write-Log "Loaded catalog: $($catalog.basePackages.Count) base package(s), $($catalog.eclipseVersions.Count) Eclipse version(s), $($catalog.plugins.Count) plugin(s)" -Level DEBUG
 
 if ($ListFeatures) {
     Write-Host "Available base packages:" -ForegroundColor Cyan
@@ -117,6 +118,7 @@ if ($ListFeatures) {
 }
 
 Initialize-BundlerLog -LogDirectory (Join-Path $scriptRoot 'logs') | Out-Null
+Write-Log "Parameters: InstallPath='$InstallPath' BasePackage='$BasePackage' EclipseVersion='$EclipseVersion' Features=$($Features -join ',') DevEposChannel='$DevEposChannel' NonInteractive=$NonInteractive CacheDirectory='$CacheDirectory'" -Level DEBUG
 
 if (-not $NonInteractive -and (Test-InteractiveConsole)) {
     Write-Banner -Title 'eclipsADT-o-Mat' -Subtitle 'Eclipse + ABAP Development Tools + Additional Plugins'
@@ -138,7 +140,9 @@ function Get-SupportedEclipseVersions {
 
     if ($BasePackageEntry.downloads) {
         $supportedIds = @($BasePackageEntry.downloads.PSObject.Properties.Name)
-        return @($catalog.eclipseVersions | Where-Object { $_.id -in $supportedIds })
+        $supported = @($catalog.eclipseVersions | Where-Object { $_.id -in $supportedIds })
+        Write-Log "Get-SupportedEclipseVersions: '$($BasePackageEntry.id)' supports $($supported.Count) of $($catalog.eclipseVersions.Count) version(s)" -Level DEBUG
+        return $supported
     }
     return @($catalog.eclipseVersions)
 }
@@ -167,6 +171,7 @@ function Resolve-BasePackageDownload {
     # Derive the cache file name from the (query-string free) fallback URL's leaf segment.
     $zipFileName = Split-Path -Leaf ([uri]$fallbackUrl).AbsolutePath
 
+    Write-Log "Resolve-BasePackageDownload: url='$url' fallbackUrl='$fallbackUrl' zipFileName='$zipFileName'" -Level DEBUG
     return [PSCustomObject]@{ Url = $url; FallbackUrl = $fallbackUrl; ZipFileName = $zipFileName }
 }
 
@@ -199,6 +204,7 @@ $supportedVersions = Get-SupportedEclipseVersions -BasePackageEntry $basePackage
 if ($supportedVersions.Count -eq 0) {
     throw "Base package '$BasePackage' does not support any known Eclipse version."
 }
+Write-Log "Supported Eclipse versions for '$BasePackage': $(($supportedVersions.id) -join ', ')" -Level DEBUG
 
 # --- Step 2: Eclipse version --------------------------------------------------
 if (-not $EclipseVersion) {
@@ -214,6 +220,7 @@ if (-not $EclipseVersion) {
     }
 }
 Write-Log "Selected Eclipse version: $EclipseVersion" -Level INFO
+Write-Log "Eclipse version resolved via $(if ($NonInteractive) { 'parameter' } else { 'menu' }): '$EclipseVersion'" -Level DEBUG
 
 # --- Step 3: install path ----------------------------------------------------
 # Set when the user opts to add ADT/plugins to an already-installed Eclipse of
@@ -269,6 +276,7 @@ if ($NonInteractive) {
     }
 }
 Write-Log "Install path: $InstallPath" -Level INFO
+Write-Log "Reuse existing Eclipse root: $reuseExistingEclipseRoot" -Level DEBUG
 
 # --- Step 4: plugin selection -------------------------------------------------
 $selectedPlugins = @()
@@ -285,6 +293,7 @@ if ($NonInteractive) {
     $selectedPlugins = Read-MultiSelect -Title "Select additional plugins to install (ADT itself is always installed):" `
         -Options $catalog.plugins -LabelProperty 'name' -DescriptionProperty 'description' -GroupProperty 'category'
 }
+Write-Log "Selected plugins: $(($selectedPlugins.id) -join ', ')" -Level DEBUG
 
 $selectedDevEpos = @($selectedPlugins | Where-Object { $_.category -eq 'devepos' })
 # Note: name must differ from the $DevEposChannel parameter - variable names are
@@ -353,6 +362,7 @@ if ($reuseExistingEclipseRoot) {
     $eclipseRoot = Expand-EclipseZip -ZipPath $zipPath -InstallPath $InstallPath
 }
 $eclipseExe = Join-Path $eclipseRoot 'eclipsec.exe'
+Write-Log "Eclipse root: '$eclipseRoot', eclipsec.exe: '$eclipseExe'" -Level DEBUG
 
 # --- Install ADT (+ required extra repos/IUs) --------------------------------
 $adtRepos = @((Expand-Template -Template $catalog.adt.repoUrlTemplate -Version $EclipseVersion))
@@ -361,8 +371,10 @@ if ($catalog.adt.additionalRepoUrlTemplates) {
         $adtRepos += (Expand-Template -Template $tmpl -Version $EclipseVersion)
     }
 }
+Write-Log "ADT repositories: $($adtRepos -join ', ')" -Level DEBUG
 
 $results = @()
+Write-Log "ADT installable units: $($catalog.adt.installableUnits -join ', ')" -Level DEBUG
 $adtResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories $adtRepos `
     -InstallIUs $catalog.adt.installableUnits -DestinationPath $eclipseRoot `
     -Description $catalog.adt.name
@@ -381,6 +393,7 @@ if (-not $adtResult.Success) {
 
     if ($selectedDevEpos.Count -gt 0) {
         $deveposIUs = @($selectedDevEpos | ForEach-Object { $_.installableUnits })
+        Write-Log "DevEpos installable units: $($deveposIUs -join ', ')" -Level DEBUG
         $deveposResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($activeDevEposChannel.repoUrl, $releaseTrainRepo) `
             -InstallIUs $deveposIUs -DestinationPath $eclipseRoot `
             -Description "DevEpos ($($activeDevEposChannel.id) channel)"
@@ -403,6 +416,7 @@ if (-not $adtResult.Success) {
             }
             $pluginIUs += $terminalIU
         }
+        Write-Log "Plugin '$($plugin.name)' installable units: $($pluginIUs -join ', ')" -Level DEBUG
         $pluginResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($plugin.repoUrl, $releaseTrainRepo) `
             -InstallIUs $pluginIUs -DestinationPath $eclipseRoot `
             -Description $plugin.name

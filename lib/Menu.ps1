@@ -57,8 +57,10 @@ function Read-MenuChoice {
         [int]$DefaultIndex = 0
     )
 
-    if (Test-InteractiveConsole) { return Read-MenuChoiceInteractive @PSBoundParameters }
-    return Read-MenuChoiceClassic @PSBoundParameters
+    Write-Log "Read-MenuChoice: '$Title' with $($Options.Count) option(s), default index $DefaultIndex" -Level DEBUG
+    $choice = if (Test-InteractiveConsole) { Read-MenuChoiceInteractive @PSBoundParameters } else { Read-MenuChoiceClassic @PSBoundParameters }
+    Write-Log "Read-MenuChoice: selected '$(Get-MenuOptionLabel -Option $choice -LabelProperty $LabelProperty)'" -Level DEBUG
+    return $choice
 }
 
 function Read-MenuChoiceInteractive {
@@ -213,8 +215,10 @@ function Read-MultiSelect {
         [int[]]$LockedIndices = @()
     )
 
-    if (Test-InteractiveConsole) { return Read-MultiSelectInteractive @PSBoundParameters }
-    return Read-MultiSelectClassic @PSBoundParameters
+    Write-Log "Read-MultiSelect: '$Title' with $($Options.Count) option(s), $($PreSelectedIndices.Count) pre-selected" -Level DEBUG
+    $choices = if (Test-InteractiveConsole) { Read-MultiSelectInteractive @PSBoundParameters } else { Read-MultiSelectClassic @PSBoundParameters }
+    Write-Log "Read-MultiSelect: selected $($choices.Count) item(s): $(($choices | ForEach-Object { Get-MenuOptionLabel -Option $_ -LabelProperty $LabelProperty }) -join ', ')" -Level DEBUG
+    return $choices
 }
 
 function Read-MultiSelectInteractive {

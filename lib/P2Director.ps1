@@ -45,10 +45,12 @@ function Get-EclipseP2Profile {
     if (Test-Path -LiteralPath $profileRegistry) {
         $profileDir = Get-ChildItem -LiteralPath $profileRegistry -Filter '*.profile' -Directory | Select-Object -First 1
         if ($profileDir) {
+            Write-Log "Get-EclipseP2Profile: resolved '$($profileDir.BaseName)' from profileRegistry" -Level DEBUG
             return $profileDir.BaseName
         }
     }
 
+    Write-Log "Get-EclipseP2Profile: falling back to default profile 'epp.package.java'" -Level DEBUG
     # Reasonable default for Eclipse IDE for Java Developers packages.
     return 'epp.package.java'
 }
@@ -130,6 +132,7 @@ function Invoke-P2Director {
         '-profile', $Profile
         '-followReferences'
     )
+    Write-Log "Invoke-P2Director: $EclipseExePath $($directorArgs -join ' ')" -Level DEBUG
 
     $output = @()
     $attempt = 0
@@ -152,6 +155,7 @@ function Invoke-P2Director {
             }
             $proc.WaitForExit()
             $exitCode = $proc.ExitCode
+            Write-Log "Invoke-P2Director: attempt $attempt exited with code $exitCode" -Level DEBUG
         } finally {
             Stop-ConsoleSpinner -Spinner $spinner
         }
