@@ -5,20 +5,20 @@ environment: it downloads a chosen Eclipse release, installs SAP's
 [ABAP Development Tools (ADT)](https://tools.hana.ondemand.com/#abap), and
 lets you pick additional ADT features to install alongside it:
 
-| Name                                    | Publisher | URL                                                                                     |
-|------------------------------------------|-----------|------------------------------------------------------------------------------------------|
-| ABAP Search and Analysis Tools           | DevEpos   | https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/search-tools           |
-| ABAP Tags                                | DevEpos   | https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/tags                   |
-| ABAP Code Search                         | DevEpos   | https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/code-search            |
-| PDT Tools (ADT Plugin Development Tools) | DevEpos   | https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/pdt-tools              |
-| ABAP cleaner                             | SAP       | https://github.com/SAP/abap-cleaner                                                      |
-| ABAP Favorites                           | ABAPBlog  | https://github.com/fidley/ABAPFavorites                                                  |
-| ABAP Quick Fix                           | ABAPBlog  | https://github.com/fidley/ABAPQuickFix                                                   |
-| ADT Classic Outline                      | ABAPBlog  | https://github.com/fidley/ADT-Classic-Outline-Frontend                                   |
-| ADT Extensions - Commands                | ABAPBlog  | https://github.com/fidley/ABAP-Project-Extensions                                        |
-| Vertical Tabs                            | ABAPBlog  | https://github.com/fidley/VerticalTabs                                                   |
-| Vertical Tabs ABAP Specific Features     | ABAPBlog  | https://github.com/fidley/VerticalTabs                                                   |
-| GitHub Copilot                           | Microsoft | https://github.com/microsoft/copilot-for-eclipse/                                        |
+| Name                                     | Publisher | URL                                                                              |
+| ---------------------------------------- | --------- | -------------------------------------------------------------------------------- |
+| ABAP Search and Analysis Tools           | DevEpos   | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/search-tools> |
+| ABAP Tags                                | DevEpos   | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/tags>         |
+| ABAP Code Search                         | DevEpos   | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/code-search>  |
+| PDT Tools (ADT Plugin Development Tools) | DevEpos   | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/pdt-tools>    |
+| ABAP cleaner                             | SAP       | <https://github.com/SAP/abap-cleaner>                                            |
+| ABAP Favorites                           | ABAPBlog  | <https://github.com/fidley/ABAPFavorites>                                        |
+| ABAP Quick Fix                           | ABAPBlog  | <https://github.com/fidley/ABAPQuickFix>                                         |
+| ADT Classic Outline                      | ABAPBlog  | <https://github.com/fidley/ADT-Classic-Outline-Frontend>                         |
+| ADT Extensions - Commands                | ABAPBlog  | <https://github.com/fidley/ABAP-Project-Extensions>                              |
+| Vertical Tabs                            | ABAPBlog  | <https://github.com/fidley/VerticalTabs>                                         |
+| Vertical Tabs ABAP Specific Features     | ABAPBlog  | <https://github.com/fidley/VerticalTabs>                                         |
+| GitHub Copilot                           | Microsoft | <https://github.com/microsoft/copilot-for-eclipse/>                              |
 
 It is a lightweight alternative to an Eclipse Installer/Oomph setup: no
 external tooling is required beyond PowerShell and the Eclipse package itself
@@ -53,6 +53,7 @@ and keeps the console window open after the run so errors and the log location
 remain visible.
 
 You'll be prompted for:
+
 1. The base Eclipse package to install: "Eclipse IDE for Java Developers"
    (default), "Eclipse IDE for RCP and RAP Developers" (for Eclipse
    plug-in/PDE development), or "Eclipse Platform" (minimal core runtime
@@ -99,16 +100,16 @@ plugin ids without installing anything:
 
 ### Parameters
 
-| Parameter          | Description                                                                 |
-|---------------------|-------------------------------------------------------------------------------|
-| `-InstallPath`      | Target directory. An `eclipse` subfolder is used only when the target already exists. Defaults to `.\eclipse-adt`. |
-| `-BasePackage`      | Base Eclipse package id from `catalog.json`: `java` (default), `rcp` or `platform`. |
-| `-EclipseVersion`   | Eclipse release train id, e.g. `2026-09`. Required with `-NonInteractive`. Must be supported by `-BasePackage`. |
-| `-Features`         | Array of plugin ids from `catalog.json` to install (non-interactive mode only). |
-| `-DevEposChannel`   | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`). |
-| `-NonInteractive`   | Suppresses all prompts.                                                      |
-| `-CacheDirectory`   | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\eclipsADT-o-Mat\cache`. |
-| `-ListFeatures`     | Prints the catalog contents and exits.                                       |
+| Parameter         | Description                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `-InstallPath`    | Target directory. An `eclipse` subfolder is used only when the target already exists. Defaults to `.\eclipse-adt`. |
+| `-BasePackage`    | Base Eclipse package id from `catalog.json`: `java` (default), `rcp` or `platform`.                                |
+| `-EclipseVersion` | Eclipse release train id, e.g. `2026-09`. Required with `-NonInteractive`. Must be supported by `-BasePackage`.    |
+| `-Features`       | Array of plugin ids from `catalog.json` to install (non-interactive mode only).                                    |
+| `-DevEposChannel` | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`).                           |
+| `-NonInteractive` | Suppresses all prompts.                                                                                            |
+| `-CacheDirectory` | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\eclipsADT-o-Mat\cache`.                      |
+| `-ListFeatures`   | Prints the catalog contents and exits.                                                                             |
 
 ## How it works / architecture
 
