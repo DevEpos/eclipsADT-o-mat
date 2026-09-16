@@ -29,6 +29,19 @@ function Test-ZipFile {
     }
 }
 
+function Resolve-EclipseInstallRoot {
+    param([Parameter(Mandatory)] [string]$InstallPath)
+
+    if (Test-Path -LiteralPath $InstallPath -PathType Container) {
+        $hasExistingContent = [bool](Get-ChildItem -LiteralPath $InstallPath -Force -ErrorAction Stop | Select-Object -First 1)
+        if ($hasExistingContent) {
+            return (Join-Path $InstallPath 'eclipse')
+        }
+    }
+
+    return $InstallPath
+}
+
 function Save-FileWithProgress {
     <#
     .SYNOPSIS
@@ -158,12 +171,7 @@ function Expand-EclipseZip {
         [string]$InstallPath
     )
 
-    $targetExists = Test-Path -LiteralPath $InstallPath -PathType Container
-    $eclipseRoot = if ($targetExists) {
-        Join-Path $InstallPath 'eclipse'
-    } else {
-        $InstallPath
-    }
+    $eclipseRoot = Resolve-EclipseInstallRoot -InstallPath $InstallPath
 
     if (-not (Test-Path -LiteralPath $eclipseRoot)) {
         New-Item -ItemType Directory -Force -Path $eclipseRoot | Out-Null
@@ -188,13 +196,13 @@ function Expand-EclipseZip {
             $done++
             $relativePath = $entry.FullName -replace '^eclipse[\\/]', ''
             $targetPath = [System.IO.Path]::GetFullPath((Join-Path $destRoot $relativePath))
+            $isDirectory = [string]::IsNullOrEmpty($entry.Name) -or $entry.FullName.EndsWith('/') -or $entry.FullName.EndsWith('\\')
             # Guard against zip-slip: every entry must stay inside the destination.
             if (-not $targetPath.StartsWith($destRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase) -and
                 $targetPath -ne $destRoot) {
                 throw "Zip entry '$($entry.FullName)' would extract outside the destination directory."
             }
-            if ([string]::IsNullOrEmpty($relativePath)) {
-                # Directory entry
+            if ($isDirectory) {
                 [void][System.IO.Directory]::CreateDirectory($targetPath)
             } else {
                 [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($targetPath))

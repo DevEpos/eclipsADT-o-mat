@@ -14,9 +14,9 @@
     -Features and -NonInteractive, e.g. for scripted setups.
 
 .PARAMETER InstallPath
-    Directory where the Eclipse installation will be created (a subfolder
-    'eclipse' will be created inside it). Defaults to '.\eclipse-adt' next to
-    this script.
+    Directory where the Eclipse installation will be created. If the directory
+    already exists and is not empty, a subfolder 'eclipse' will be created
+    inside it. Defaults to '.\eclipse-adt' next to this script.
 
 .PARAMETER EclipseVersion
     Eclipse release train id, e.g. '2025-06'. Must match an entry in
@@ -149,11 +149,7 @@ if ($NonInteractive) {
 # --- Step 4: confirmation -----------------------------------------------------
 if (-not $NonInteractive) {
     Write-StepHeader -Step 4 -Total 5 -Title 'Confirmation'
-    $plannedEclipseRoot = if (Test-Path -LiteralPath $InstallPath -PathType Container) {
-        Join-Path $InstallPath 'eclipse'
-    } else {
-        $InstallPath
-    }
+    $plannedEclipseRoot = Resolve-EclipseInstallRoot -InstallPath $InstallPath
     Write-Host "  Eclipse version : $EclipseVersion"
     Write-Host "  Install path    : $plannedEclipseRoot"
     Write-Host "  Base package    : $($catalog.eclipseDownload.packageName)"
