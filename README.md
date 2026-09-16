@@ -5,6 +5,9 @@ environment: it downloads a chosen Eclipse release, installs SAP's
 [ABAP Development Tools (ADT)](https://tools.hana.ondemand.com/#abap), and
 lets you pick additional ADT features to install alongside it:
 
+> See the [step-by-step walkthrough](docs/walkthrough.md) for a visual tour
+> of the wizard.
+
 | Name                                     | Publisher | URL                                                                              |
 | ---------------------------------------- | --------- | -------------------------------------------------------------------------------- |
 | ABAP Search and Analysis Tools           | DevEpos   | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/search-tools> |
