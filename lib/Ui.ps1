@@ -167,3 +167,47 @@ function Stop-ConsoleSpinner {
     [Console]::Write("`r" + (' ' * $Spinner.LastLength) + "`r")
     [Console]::CursorVisible = $true
 }
+
+function Show-DesktopNotification {
+    <#
+    .SYNOPSIS
+        Shows a Windows taskbar balloon notification (best-effort, never throws).
+
+    .PARAMETER Title
+        Notification title text.
+
+    .PARAMETER Message
+        Notification body text.
+
+    .PARAMETER Icon
+        Balloon tip icon: 'Info', 'Warning' or 'Error'. Defaults to 'Info'.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$Title,
+
+        [Parameter(Mandatory)]
+        [string]$Message,
+
+        [ValidateSet('Info', 'Warning', 'Error')]
+        [string]$Icon = 'Info'
+    )
+
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+
+        $notifyIcon = New-Object System.Windows.Forms.NotifyIcon
+        $notifyIcon.Icon = [System.Drawing.SystemIcons]::Information
+        $notifyIcon.Visible = $true
+        $notifyIcon.ShowBalloonTip(8000, $Title, $Message, [System.Windows.Forms.ToolTipIcon]::$Icon)
+
+        # Keep the tray icon alive long enough for the balloon to actually render
+        # before the process (and its icon) disappears.
+        Start-Sleep -Milliseconds 3000
+        $notifyIcon.Dispose()
+    } catch {
+        Write-Log "Could not show desktop notification: $_" -Level WARN
+    }
+}
+

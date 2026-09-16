@@ -375,9 +375,11 @@ Write-Host ""
 
 if ($anyFailed) {
     Write-Log "Completed with failures. See log for details." -Level ERROR
+    Show-DesktopNotification -Title 'ADT Bundler' -Message 'Installation completed with failures. See the log for details.' -Icon Error
     exit 1
 }
 
 Write-Log "All done. Launch Eclipse from: $eclipseRoot\eclipse.exe" -Level SUCCESS
 Write-Host "Eclipse with ADT is ready at: $eclipseRoot\eclipse.exe" -ForegroundColor Green
+Show-DesktopNotification -Title 'ADT Bundler' -Message "Installation finished. Launch Eclipse from: $eclipseRoot\eclipse.exe"
 exit 0
