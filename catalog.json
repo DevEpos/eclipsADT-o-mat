@@ -40,42 +40,104 @@
     ],
     "required": true
   },
+  "devepos": {
+    "channels": [
+      {
+        "id": "dev",
+        "label": "DevEpos development channel",
+        "repoUrl": "https://eclipse.devepos.com/dev"
+      },
+      {
+        "id": "latest",
+        "label": "DevEpos latest stable channel",
+        "repoUrl": "https://eclipse.devepos.com/latest"
+      }
+    ]
+  },
   "plugins": [
     {
       "id": "devepos-search-tools",
       "name": "ABAP Search and Analysis Tools",
       "description": "DevEpos: Enhanced search and analysis tools for ABAP repository objects.",
-      "category": "devepos",
-      "channel": "stable",
-      "repoUrl": "https://eclipse.devepos.com/latest",
+      "category": "DevEpos",
       "installableUnits": ["com.devepos.adt.searchandanalysistools.feature.group"]
     },
     {
       "id": "devepos-tags",
       "name": "ABAP Tags",
       "description": "DevEpos: Tag and organize ABAP repository objects, and search by tag.",
-      "category": "devepos",
-      "channel": "stable",
-      "repoUrl": "https://eclipse.devepos.com/latest",
+      "category": "DevEpos",
       "installableUnits": ["com.devepos.adt.abaptags.feature.group"]
     },
     {
       "id": "devepos-code-search",
       "name": "ABAP Code Search",
       "description": "DevEpos: Fast full-text/code search across ABAP repository objects.",
-      "category": "devepos",
-      "channel": "stable",
-      "repoUrl": "https://eclipse.devepos.com/latest",
+      "category": "DevEpos",
       "installableUnits": ["com.devepos.adt.codesearch.feature.group"]
     },
     {
       "id": "devepos-pdt-tools",
       "name": "PDT Tools (ADT Plugin Development Tools)",
       "description": "DevEpos: Tooling to support development of ADT plug-ins themselves.",
-      "category": "devepos",
-      "channel": "stable",
-      "repoUrl": "https://eclipse.devepos.com/latest",
+      "category": "DevEpos",
       "installableUnits": ["com.devepos.adt.pdt.feature.group"]
+    },
+    {
+      "id": "abapblog-favorites",
+      "name": "ABAP Favorites",
+      "description": "ABAPBlog: Manage favorite transactions, URLs and development objects in Eclipse.",
+      "category": "ABAPBlog",
+      "repoUrl": "https://fidley.github.io/ADTPluginsUpdateSite/UpdateSite/",
+      "installableUnits": ["ABAP_Favorites_Feature_Project.feature.group"]
+    },
+    {
+      "id": "abapblog-quick-fix",
+      "name": "ABAP Quick Fix",
+      "description": "ABAPBlog: Quick fixes and source transformations for ABAP development.",
+      "category": "ABAPBlog",
+      "repoUrl": "https://fidley.github.io/ADTPluginsUpdateSite/UpdateSite/",
+      "installableUnits": ["com.abapblog.adt.quickfix.feature.feature.group"]
+    },
+    {
+      "id": "abapblog-classic-outline",
+      "name": "ADT Classic Outline",
+      "description": "ABAPBlog: A classic SE80-style outline view for ADT.",
+      "category": "ABAPBlog",
+      "repoUrl": "https://fidley.github.io/ADTPluginsUpdateSite/UpdateSite/",
+      "installableUnits": ["ADT_Classic_Outline_Feature.feature.group"]
+    },
+    {
+      "id": "abapblog-extensions-commands",
+      "name": "ADT Extensions - Commands",
+      "description": "ABAPBlog: Additional commands for ABAP Development Tools.",
+      "category": "ABAPBlog",
+      "repoUrl": "https://fidley.github.io/ADTPluginsUpdateSite/UpdateSite/",
+      "installableUnits": ["com.abapblog.adt.extensions.feature.feature.group"]
+    },
+    {
+      "id": "abapblog-vertical-tabs",
+      "name": "Vertical Tabs",
+      "description": "ABAPBlog: Organize Eclipse tabs vertically.",
+      "category": "ABAPBlog",
+      "repoUrl": "https://fidley.github.io/VerticalTabs/",
+      "installableUnits": ["com.abapblog.verticaltabs.feature.feature.group"]
+    },
+    {
+      "id": "abapblog-vertical-tabs-abap",
+      "name": "Vertical Tabs ABAP Specific Features",
+      "description": "ABAPBlog: ABAP-specific features for Vertical Tabs.",
+      "category": "ABAPBlog",
+      "repoUrl": "https://fidley.github.io/VerticalTabs/",
+      "installableUnits": ["com.abapblog.verticaltabs.abap.feature.feature.group"]
+    },
+    {
+      "id": "sap-abap-cleaner",
+      "name": "ABAP cleaner",
+      "description": "SAP: Source-code cleanup and formatting for ABAP Development Tools.",
+      "category": "SAP",
+      "repoUrl": "https://sap.github.io/abap-cleaner/updatesite",
+      "installableUnits": ["com.sap.adt.abapcleaner.feature.feature.group"]
     },
     {
       "id": "github-copilot",

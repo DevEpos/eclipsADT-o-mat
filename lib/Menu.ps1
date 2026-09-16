@@ -19,6 +19,11 @@ function Get-MenuOptionLabel {
     return $Option.ToString()
 }
 
+function Get-MenuPageSize {
+    # Lines available for menu rows below the title and hint lines.
+    try { return [Math]::Max(1, [Console]::WindowHeight - 3) } catch { return 10 }
+}
+
 function Read-MenuChoice {
     <#
     .SYNOPSIS
@@ -71,29 +76,38 @@ function Read-MenuChoiceInteractive {
     $esc = [char]27
     $current = [Math]::Min([Math]::Max(0, $DefaultIndex), $Options.Count - 1)
 
-    Write-Host ""
-    Write-Host $Title -ForegroundColor Cyan
-    Write-Host "  Up/Down move · Enter select · 1-9 jump" -ForegroundColor DarkGray
-
-    $renderMenu = {
-        for ($i = 0; $i -lt $Options.Count; $i++) {
-            $label = Get-MenuOptionLabel -Option $Options[$i] -LabelProperty $LabelProperty
-            if ($i -eq $current) {
-                Write-Host ("$esc[2K" + (Limit-UiLine ("  > {0}" -f $label))) -ForegroundColor Cyan
-            } else {
-                Write-Host ("$esc[2K" + (Limit-UiLine ("    {0}" -f $label)))
-            }
-        }
-    }
-
     [Console]::CursorVisible = $false
+    Clear-Host
     try {
-        & $renderMenu
         while ($true) {
+            $pageSize = Get-MenuPageSize
+            $pageCount = [int][Math]::Ceiling($Options.Count / $pageSize)
+            $page = [int][Math]::Floor($current / $pageSize)
+            $start = $page * $pageSize
+            $end = [Math]::Min($start + $pageSize, $Options.Count) - 1
+
+            [Console]::SetCursorPosition(0, 0)
+            Write-Host ("$esc[2K" + (Limit-UiLine $Title)) -ForegroundColor Cyan
+            $hint = "  Up/Down move · Enter select · 1-9 jump"
+            if ($pageCount -gt 1) { $hint += " · PgUp/PgDn page $($page + 1)/$pageCount" }
+            Write-Host ("$esc[2K" + (Limit-UiLine $hint)) -ForegroundColor DarkGray
+
+            for ($i = $start; $i -le $end; $i++) {
+                $label = Get-MenuOptionLabel -Option $Options[$i] -LabelProperty $LabelProperty
+                if ($i -eq $current) {
+                    Write-Host ("$esc[2K" + (Limit-UiLine ("  > {0}" -f $label))) -ForegroundColor Cyan
+                } else {
+                    Write-Host ("$esc[2K" + (Limit-UiLine ("    {0}" -f $label)))
+                }
+            }
+            [Console]::Write("$esc[0J")
+
             $key = [Console]::ReadKey($true)
             switch ($key.Key) {
                 'UpArrow'   { $current = ($current - 1 + $Options.Count) % $Options.Count }
                 'DownArrow' { $current = ($current + 1) % $Options.Count }
+                'PageUp'    { $current = [Math]::Max(0, $current - $pageSize) }
+                'PageDown'  { $current = [Math]::Min($Options.Count - 1, $current + $pageSize) }
                 'Home'      { $current = 0 }
                 'End'       { $current = $Options.Count - 1 }
                 'Enter'     { return $Options[$current] }
@@ -104,10 +118,9 @@ function Read-MenuChoiceInteractive {
                     }
                 }
             }
-            [Console]::Write("$esc[$($Options.Count)A")
-            & $renderMenu
         }
     } finally {
+        Clear-Host
         [Console]::CursorVisible = $true
     }
 }
@@ -224,72 +237,94 @@ function Read-MultiSelectInteractive {
     foreach ($i in $PreSelectedIndices) { $selected[$i] = $true }
     foreach ($i in $LockedIndices) { $selected[$i] = $true }
 
-    # Build the row model: group headers interleaved with option rows.
-    $rows = [System.Collections.Generic.List[object]]::new()
-    if ($GroupProperty) {
-        $lastGroup = $null
-        for ($i = 0; $i -lt $Options.Count; $i++) {
+    # One display block per option: optional group header, the option line and
+    # its optional description line. Blocks are never split across pages.
+    $blocks = @()
+    $lastGroup = $null
+    for ($i = 0; $i -lt $Options.Count; $i++) {
+        $lines = [System.Collections.Generic.List[object]]::new()
+        if ($GroupProperty) {
             $group = [string]$Options[$i].$GroupProperty
             if ($group -ne $lastGroup) {
-                $rows.Add(@{ Type = 'Header'; Text = (Get-Culture).TextInfo.ToTitleCase($group) })
+                $lines.Add(@{ Kind = 'Header'; Text = $group })
                 $lastGroup = $group
             }
-            $rows.Add(@{ Type = 'Option'; Index = $i })
         }
-    } else {
-        for ($i = 0; $i -lt $Options.Count; $i++) { $rows.Add(@{ Type = 'Option'; Index = $i }) }
-    }
-
-    $optionRowPositions = @(0..($rows.Count - 1) | Where-Object { $rows[$_].Type -eq 'Option' })
-    $cursor = 0  # index into $optionRowPositions
-
-    # Total rendered lines: one per row plus one per option description.
-    $lineCount = $rows.Count
-    if ($DescriptionProperty) {
-        $lineCount += @($Options | Where-Object { $_.$DescriptionProperty }).Count
-    }
-
-    Write-Host ""
-    Write-Host $Title -ForegroundColor Cyan
-    Write-Host "  Up/Down move · Space toggle · a all · n none · Enter confirm" -ForegroundColor DarkGray
-
-    $renderMenu = {
-        foreach ($row in $rows) {
-            if ($row.Type -eq 'Header') {
-                Write-Host ("$esc[2K" + (Limit-UiLine ("  {0}" -f $row.Text))) -ForegroundColor DarkGray
-                continue
-            }
-            $i = $row.Index
-            $label = Get-MenuOptionLabel -Option $Options[$i] -LabelProperty $LabelProperty
-            $check = if ($selected[$i]) { 'x' } else { ' ' }
-            $lockTag = if ($LockedIndices -contains $i) { ' (required)' } else { '' }
-            $isCurrent = ($optionRowPositions[$cursor] -eq $rows.IndexOf($row))
-            $pointer = if ($isCurrent) { '>' } else { ' ' }
-            $line = "$esc[2K" + (Limit-UiLine ("  {0} [{1}] {2}{3}" -f $pointer, $check, $label, $lockTag))
-            if ($isCurrent) {
-                Write-Host $line -ForegroundColor Cyan
-            } else {
-                Write-Host $line
-            }
-            if ($DescriptionProperty -and $Options[$i].$DescriptionProperty) {
-                Write-Host ("$esc[2K" + (Limit-UiLine ("        {0}" -f $Options[$i].$DescriptionProperty))) -ForegroundColor DarkGray
-            }
+        $lines.Add(@{ Kind = 'Option'; Index = $i })
+        if ($DescriptionProperty -and $Options[$i].$DescriptionProperty) {
+            $lines.Add(@{ Kind = 'Description'; Index = $i })
         }
+        $blocks += , $lines
     }
+
+    $current = 0
 
     [Console]::CursorVisible = $false
+    Clear-Host
     try {
-        & $renderMenu
         while ($true) {
+            # Re-page on every draw so window resizes are picked up.
+            $pageSize = Get-MenuPageSize
+            $pages = [System.Collections.Generic.List[object]]::new()
+            $pageOfOption = New-Object int[] $Options.Count
+            $page = [System.Collections.Generic.List[object]]::new()
+            $pageLines = 0
+            for ($i = 0; $i -lt $blocks.Count; $i++) {
+                if ($page.Count -gt 0 -and ($pageLines + $blocks[$i].Count) -gt $pageSize) {
+                    $pages.Add($page)
+                    $page = [System.Collections.Generic.List[object]]::new()
+                    $pageLines = 0
+                }
+                $page.Add($blocks[$i])
+                $pageOfOption[$i] = $pages.Count
+                $pageLines += $blocks[$i].Count
+            }
+            if ($page.Count -gt 0) { $pages.Add($page) }
+            $pageIndex = $pageOfOption[$current]
+
+            [Console]::SetCursorPosition(0, 0)
+            Write-Host ("$esc[2K" + (Limit-UiLine $Title)) -ForegroundColor Cyan
+            $hint = "  Up/Down move · Space toggle · a all · n none · Enter confirm"
+            if ($pages.Count -gt 1) { $hint += " · PgUp/PgDn page $($pageIndex + 1)/$($pages.Count)" }
+            Write-Host ("$esc[2K" + (Limit-UiLine $hint)) -ForegroundColor DarkGray
+
+            foreach ($block in $pages[$pageIndex]) {
+                foreach ($line in $block) {
+                    switch ($line.Kind) {
+                        'Header' {
+                            Write-Host ("$esc[2K" + (Limit-UiLine ("  {0}" -f $line.Text))) -ForegroundColor DarkGray
+                        }
+                        'Option' {
+                            $i = $line.Index
+                            $label = Get-MenuOptionLabel -Option $Options[$i] -LabelProperty $LabelProperty
+                            $check = if ($selected[$i]) { 'x' } else { ' ' }
+                            $lockTag = if ($LockedIndices -contains $i) { ' (required)' } else { '' }
+                            $pointer = if ($i -eq $current) { '>' } else { ' ' }
+                            $text = "$esc[2K" + (Limit-UiLine ("  {0} [{1}] {2}{3}" -f $pointer, $check, $label, $lockTag))
+                            if ($i -eq $current) {
+                                Write-Host $text -ForegroundColor Cyan
+                            } else {
+                                Write-Host $text
+                            }
+                        }
+                        'Description' {
+                            Write-Host ("$esc[2K" + (Limit-UiLine ("        {0}" -f $Options[$line.Index].$DescriptionProperty))) -ForegroundColor DarkGray
+                        }
+                    }
+                }
+            }
+            [Console]::Write("$esc[0J")
+
             $key = [Console]::ReadKey($true)
             switch ($key.Key) {
-                'UpArrow'   { $cursor = ($cursor - 1 + $optionRowPositions.Count) % $optionRowPositions.Count }
-                'DownArrow' { $cursor = ($cursor + 1) % $optionRowPositions.Count }
-                'Home'      { $cursor = 0 }
-                'End'       { $cursor = $optionRowPositions.Count - 1 }
+                'UpArrow'   { $current = ($current - 1 + $Options.Count) % $Options.Count }
+                'DownArrow' { $current = ($current + 1) % $Options.Count }
+                'PageUp'    { $current = [Array]::IndexOf($pageOfOption, [int][Math]::Max(0, $pageIndex - 1)) }
+                'PageDown'  { $current = [Array]::IndexOf($pageOfOption, [int][Math]::Min($pages.Count - 1, $pageIndex + 1)) }
+                'Home'      { $current = 0 }
+                'End'       { $current = $Options.Count - 1 }
                 'Spacebar'  {
-                    $idx = $rows[$optionRowPositions[$cursor]].Index
-                    if ($LockedIndices -notcontains $idx) { $selected[$idx] = -not $selected[$idx] }
+                    if ($LockedIndices -notcontains $current) { $selected[$current] = -not $selected[$current] }
                 }
                 'Enter' {
                     $result = @()
@@ -315,10 +350,9 @@ function Read-MultiSelectInteractive {
                     }
                 }
             }
-            [Console]::Write("$esc[$($lineCount)A")
-            & $renderMenu
         }
     } finally {
+        Clear-Host
         [Console]::CursorVisible = $true
     }
 }

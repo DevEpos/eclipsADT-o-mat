@@ -28,6 +28,11 @@
     e.g. -Features devepos-search-tools,devepos-tags. Use -ListFeatures to see
     all available ids. Ignored in interactive mode (the menu is used instead).
 
+.PARAMETER DevEposChannel
+    DevEpos update channel to use for all selected DevEpos plugins: 'dev' or
+    'latest'. Defaults to 'latest'. In interactive mode, the selected channel
+    is chosen after plugin selection.
+
 .PARAMETER NonInteractive
     Suppresses all prompts. Requires -EclipseVersion. -InstallPath and
     -Features fall back to defaults (default install path, no extra plugins)
@@ -58,6 +63,9 @@ param(
 
     [string[]]$Features,
 
+    [ValidateSet('dev', 'latest')]
+    [string]$DevEposChannel = 'latest',
+
     [switch]$NonInteractive,
 
     [string]$CacheDirectory = (Join-Path $env:LOCALAPPDATA 'AdtBundler\cache'),
@@ -85,9 +93,9 @@ if ($ListFeatures) {
     $catalog.eclipseVersions | ForEach-Object { Write-Host ("  {0,-9} {1}" -f $_.id, $_.label) }
     Write-Host ""
     Write-Host "Available plugins:" -ForegroundColor Cyan
-    Write-Host ("  {0,-26} {1,-12} {2,-7} {3}" -f 'ID', 'CATEGORY', 'CHANNEL', 'NAME') -ForegroundColor DarkGray
+    Write-Host ("  {0,-26} {1,-12} {2}" -f 'ID', 'CATEGORY', 'NAME') -ForegroundColor DarkGray
     $catalog.plugins | ForEach-Object {
-        Write-Host ("  {0,-26} {1,-12} {2,-7} {3}" -f $_.id, $_.category, $_.channel, $_.name)
+        Write-Host ("  {0,-26} {1,-12} {2}" -f $_.id, $_.category, $_.name)
     }
     return
 }
@@ -146,6 +154,31 @@ if ($NonInteractive) {
         -Options $catalog.plugins -LabelProperty 'name' -DescriptionProperty 'description' -GroupProperty 'category'
 }
 
+$selectedDevEpos = @($selectedPlugins | Where-Object { $_.category -eq 'devepos' })
+# Note: name must differ from the $DevEposChannel parameter - variable names are
+# case-insensitive and its ValidateSet would reject assigning $null.
+$activeDevEposChannel = $null
+if ($selectedDevEpos.Count -gt 0) {
+    if (-not $catalog.devepos -or -not $catalog.devepos.channels) {
+        throw 'catalog.json does not define DevEpos channels.'
+    }
+
+    $channelId = $DevEposChannel
+    if (-not $NonInteractive) {
+        $channelOptions = @($catalog.devepos.channels)
+        $defaultChannelIndex = [Math]::Max(0, [Array]::IndexOf(@($channelOptions.id), 'latest'))
+        $selectedChannel = Read-MenuChoice -Title 'Select the DevEpos channel for all selected DevEpos plugins:' `
+            -Options $channelOptions -LabelProperty 'label' -DefaultIndex $defaultChannelIndex
+        if ($selectedChannel -and $selectedChannel.id) { $channelId = [string]$selectedChannel.id }
+    }
+
+    $activeDevEposChannel = $catalog.devepos.channels | Where-Object { $_.id -eq $channelId }
+    if (-not $activeDevEposChannel) {
+        throw "Unknown DevEpos channel '$channelId'. Valid values: $($catalog.devepos.channels.id -join ', ')."
+    }
+    Write-Log "DevEpos channel: $($activeDevEposChannel.id)" -Level INFO
+}
+
 # --- Step 4: confirmation -----------------------------------------------------
 if (-not $NonInteractive) {
     Write-StepHeader -Step 4 -Total 5 -Title 'Confirmation'
@@ -154,6 +187,9 @@ if (-not $NonInteractive) {
     Write-Host "  Install path    : $plannedEclipseRoot"
     Write-Host "  Base package    : $($catalog.eclipseDownload.packageName)"
     Write-Host "  ADT             : $($catalog.adt.name) (always installed)"
+    if ($activeDevEposChannel) {
+        Write-Host "  DevEpos channel : $($activeDevEposChannel.label)"
+    }
     if ($selectedPlugins.Count -gt 0) {
         Write-Host "  Extra plugins   :"
         $selectedPlugins | ForEach-Object { Write-Host "    - $($_.name)" }
@@ -203,7 +239,17 @@ if (-not $adtResult.Success) {
     Write-Log "ADT installation failed - skipping additional plugins since they depend on ADT." -Level ERROR
 } else {
     # --- Step 7: install selected plugins ------------------------------------
-    foreach ($plugin in $selectedPlugins) {
+    if ($selectedDevEpos.Count -gt 0) {
+        $deveposIUs = @($selectedDevEpos | ForEach-Object { $_.installableUnits })
+        $deveposResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($activeDevEposChannel.repoUrl) `
+            -InstallIUs $deveposIUs -DestinationPath $eclipseRoot `
+            -Description "DevEpos ($($activeDevEposChannel.id) channel)"
+        foreach ($plugin in $selectedDevEpos) {
+            $results += [PSCustomObject]@{ Name = $plugin.name; Success = $deveposResult.Success }
+        }
+    }
+
+    foreach ($plugin in @($selectedPlugins | Where-Object { $_.category -ne 'devepos' })) {
         $pluginResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($plugin.repoUrl) `
             -InstallIUs $plugin.installableUnits -DestinationPath $eclipseRoot `
             -Description $plugin.name

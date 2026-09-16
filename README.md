@@ -49,6 +49,8 @@ You'll be prompted for:
   Eclipse root.
 3. Which additional plugins to install alongside ADT (multi-select: toggle a
    number, `a` = all, `n` = none, Enter to confirm).
+4. Which DevEpos channel to use for all selected DevEpos plugins: `dev` or
+  `latest`.
 
 The wizard then downloads the matching "Eclipse IDE for Java Developers"
 package (cached locally so re-runs don't re-download), extracts it, and runs
@@ -61,6 +63,10 @@ the Eclipse p2 director headlessly to install ADT and your chosen plugins.
     -InstallPath C:\dev\eclipse-adt `
     -Features devepos-search-tools,devepos-tags
 ```
+
+  Use `-DevEposChannel dev` to install selected DevEpos plugins from the
+  development channel. The default is `latest`, and one channel is always used
+  for all selected DevEpos plugins.
 
 Use `-ListFeatures` to print all available Eclipse versions and plugin ids
 without installing anything:
@@ -76,6 +82,7 @@ without installing anything:
 | `-InstallPath`      | Target directory. An `eclipse` subfolder is used only when the target already exists. Defaults to `.\eclipse-adt`. |
 | `-EclipseVersion`   | Eclipse release train id, e.g. `2025-06`. Required with `-NonInteractive`.   |
 | `-Features`         | Array of plugin ids from `catalog.json` to install (non-interactive mode only). |
+| `-DevEposChannel`   | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`). |
 | `-NonInteractive`   | Suppresses all prompts.                                                      |
 | `-CacheDirectory`   | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\AdtBundler\cache`. |
 | `-ListFeatures`     | Prints the catalog contents and exits.                                       |
@@ -87,7 +94,7 @@ installer/
   Setup-AdtEclipse.ps1   # main wizard entry point (interactive + unattended)
   Start-AdtEclipse.cmd   # Explorer-friendly launcher for the interactive wizard
   catalog.json            # data-driven catalog: Eclipse versions, ADT repo(s)
-                           # + installable units, DevEpos + third-party plugins
+                           # + installable units, DevEpos channels/plugins + third-party plugins
   lib/
     Download.ps1           # cache-aware download + Eclipse zip extraction
     P2Director.ps1          # wrapper around eclipsec.exe's p2 director
@@ -140,6 +147,9 @@ new Eclipse release train or a new plugin.
 - **New plugin**: add an entry to `plugins` with `id`, `name`, `description`,
   `category`, `repoUrl` (the plugin's p2 update site) and `installableUnits`
   (the feature group id(s) to install, e.g. `com.example.foo.feature.group`).
+- DevEpos plugins use the channel repository selected in the `devepos.channels`
+  section. Do not add a per-plugin DevEpos repository, since mixing channels is
+  unsupported.
   You can find a plugin's feature group id by browsing its p2 repository's
   `content.xml` (inside `content.xml.xz`/`content.jar`) for
   `<unit id='...feature.group' ...>` entries, or by adding the site in the
