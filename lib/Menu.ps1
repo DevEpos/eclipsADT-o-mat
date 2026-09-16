@@ -403,13 +403,30 @@ function Read-PathPrompt {
         [string]$DefaultPath
     )
 
-    Write-Host ""
-    Write-Host -NoNewline "$Message "
-    Write-Host -NoNewline "[default: $DefaultPath]" -ForegroundColor DarkGray
-    Write-Host -NoNewline ": "
-    $answer = [Console]::ReadLine()
-    if ([string]::IsNullOrWhiteSpace($answer)) { return $DefaultPath }
-    return $answer.Trim().Trim('"')
+    while ($true) {
+        Write-Host ""
+        Write-Host -NoNewline "$Message "
+        Write-Host -NoNewline "[Enter = default, B = browse: $DefaultPath]" -ForegroundColor DarkGray
+        Write-Host -NoNewline ": "
+        $answer = [Console]::ReadLine()
+        if ([string]::IsNullOrWhiteSpace($answer)) { return $DefaultPath }
+        if ($answer.Trim().Equals('b', [System.StringComparison]::OrdinalIgnoreCase)) {
+            Add-Type -AssemblyName System.Windows.Forms
+            $dialog = [System.Windows.Forms.FolderBrowserDialog]::new()
+            $dialog.Description = $Message
+            $dialog.SelectedPath = $DefaultPath
+            $dialog.ShowNewFolderButton = $true
+            try {
+                if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+                    return $dialog.SelectedPath
+                }
+            } finally {
+                $dialog.Dispose()
+            }
+            continue
+        }
+        return $answer.Trim().Trim('"')
+    }
 }
 
 function Read-YesNo {

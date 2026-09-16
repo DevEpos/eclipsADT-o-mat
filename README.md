@@ -43,8 +43,10 @@ remain visible.
 You'll be prompted for:
 1. The Eclipse release train to install (e.g. `2025-06`) - the latest
    supported version is preselected.
-2. The install directory. If it already exists, Eclipse is placed in an
-  `eclipse` subfolder; a new directory is used as the Eclipse root.
+2. The install directory. Press `B` at this prompt to choose a folder in
+  Windows Explorer, or type a path directly. If it already exists, Eclipse
+  is placed in an `eclipse` subfolder; a new directory is used as the
+  Eclipse root.
 3. Which additional plugins to install alongside ADT (multi-select: toggle a
    number, `a` = all, `n` = none, Enter to confirm).
 
