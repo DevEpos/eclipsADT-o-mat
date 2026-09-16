@@ -42,6 +42,78 @@ function Resolve-EclipseInstallRoot {
     return $InstallPath
 }
 
+function Find-ExistingEclipse {
+    <#
+    .SYNOPSIS
+        Returns the root of an existing Eclipse installation reachable from
+        $InstallPath (either directly or in the 'eclipse' subfolder that
+        Resolve-EclipseInstallRoot would have created), or $null if none.
+    #>
+    param([Parameter(Mandatory)] [string]$InstallPath)
+
+    foreach ($candidate in @($InstallPath, (Join-Path $InstallPath 'eclipse'))) {
+        if (Test-Path -LiteralPath (Join-Path $candidate 'eclipse.exe')) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+    return $null
+}
+
+function Get-InstalledEclipsePlatformVersion {
+    <#
+    .SYNOPSIS
+        Reads the major.minor Eclipse platform version (e.g. '4.36') from an
+        existing installation, or $null if it can't be determined.
+    #>
+    param([Parameter(Mandatory)] [string]$EclipseRoot)
+
+    # The platform feature folder/jar carries the major.minor version reliably
+    # across both EPP (java/rcp) and minimal 'platform' packages.
+    $featuresDir = Join-Path $EclipseRoot 'features'
+    if (Test-Path -LiteralPath $featuresDir) {
+        $feature = Get-ChildItem -LiteralPath $featuresDir -Filter 'org.eclipse.platform_*' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($feature -and $feature.Name -match 'org\.eclipse\.platform_(\d+\.\d+)') {
+            return $Matches[1]
+        }
+    }
+
+    # Fall back to the .eclipseproduct marker file at the install root.
+    $productFile = Join-Path $EclipseRoot '.eclipseproduct'
+    if (Test-Path -LiteralPath $productFile) {
+        $versionLine = Get-Content -LiteralPath $productFile | Where-Object { $_ -match '^version=(\d+\.\d+)' } | Select-Object -First 1
+        if ($versionLine -match '^version=(\d+\.\d+)') {
+            return $Matches[1]
+        }
+    }
+
+    return $null
+}
+
+function Resolve-EclipseVersionIdFromInstall {
+    <#
+    .SYNOPSIS
+        Maps an existing Eclipse installation to its catalog release-train id
+        (e.g. '2025-06') by matching the installed platform version against the
+        catalog's eclipseVersions labels, or $null if it can't be resolved.
+    #>
+    param(
+        [Parameter(Mandatory)] [string]$EclipseRoot,
+
+        [Parameter(Mandatory)] $EclipseVersions
+    )
+
+    $platformVersion = Get-InstalledEclipsePlatformVersion -EclipseRoot $EclipseRoot
+    if (-not $platformVersion) { return $null }
+
+    foreach ($version in $EclipseVersions) {
+        if ($version.label -match "\($([regex]::Escape($platformVersion))\)") {
+            return $version.id
+        }
+    }
+    return $null
+}
+
 function Save-FileWithProgress {
     <#
     .SYNOPSIS

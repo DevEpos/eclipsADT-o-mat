@@ -216,13 +216,56 @@ if (-not $EclipseVersion) {
 Write-Log "Selected Eclipse version: $EclipseVersion" -Level INFO
 
 # --- Step 3: install path ----------------------------------------------------
-if (-not $InstallPath) {
-    $defaultPath = Join-Path (Get-Location) 'eclipse-adt'
-    if ($NonInteractive) {
-        $InstallPath = $defaultPath
-    } else {
-        Write-StepHeader -Step 3 -Total 6 -Title 'Install location'
-        $InstallPath = Read-PathPrompt -Message "Where should Eclipse be installed?" -DefaultPath $defaultPath
+# Set when the user opts to add ADT/plugins to an already-installed Eclipse of
+# the matching version; skips the download/extract step later.
+$reuseExistingEclipseRoot = $null
+$defaultPath = Join-Path (Get-Location) 'eclipse-adt'
+
+if ($NonInteractive) {
+    if (-not $InstallPath) { $InstallPath = $defaultPath }
+    $existingRoot = Find-ExistingEclipse -InstallPath $InstallPath
+    if ($existingRoot) {
+        $installedVersion = Resolve-EclipseVersionIdFromInstall -EclipseRoot $existingRoot -EclipseVersions $catalog.eclipseVersions
+        if ($installedVersion -ne $EclipseVersion) {
+            Write-Log "Existing Eclipse at '$existingRoot' is version '$installedVersion' but '$EclipseVersion' was requested. Installation cancelled." -Level ERROR
+            exit 1
+        }
+        Write-Log "Reusing existing Eclipse ($EclipseVersion) at '$existingRoot'." -Level INFO
+        $reuseExistingEclipseRoot = $existingRoot
+    }
+} else {
+    Write-StepHeader -Step 3 -Total 6 -Title 'Install location'
+    while ($true) {
+        if (-not $InstallPath) {
+            $InstallPath = Read-PathPrompt -Message "Where should Eclipse be installed?" -DefaultPath $defaultPath
+        }
+
+        $existingRoot = Find-ExistingEclipse -InstallPath $InstallPath
+        if (-not $existingRoot) { break }
+
+        Write-Host ""
+        Write-Host "  An existing Eclipse installation was found at: $existingRoot" -ForegroundColor Yellow
+        if (-not (Read-YesNo -Message "  Add ADT and the chosen plugins to this existing installation?" -DefaultYes $true)) {
+            Write-Host "  Please choose a different folder." -ForegroundColor DarkGray
+            $InstallPath = $null
+            continue
+        }
+
+        $installedVersion = Resolve-EclipseVersionIdFromInstall -EclipseRoot $existingRoot -EclipseVersions $catalog.eclipseVersions
+        if ($installedVersion -ne $EclipseVersion) {
+            $foundLabel = if ($installedVersion) { $installedVersion } else { 'unknown' }
+            Write-Host "  The existing installation is Eclipse '$foundLabel', which does not match the selected '$EclipseVersion'." -ForegroundColor Red
+            if (-not (Read-YesNo -Message "  Choose a different folder? (answering no cancels the installation)" -DefaultYes $true)) {
+                Write-Log "Existing Eclipse at '$existingRoot' is version '$foundLabel' but '$EclipseVersion' was requested. Installation cancelled by user." -Level WARN
+                return
+            }
+            $InstallPath = $null
+            continue
+        }
+
+        Write-Host "  Version matches ($EclipseVersion) - ADT and plugins will be added to this installation." -ForegroundColor Green
+        $reuseExistingEclipseRoot = $existingRoot
+        break
     }
 }
 Write-Log "Install path: $InstallPath" -Level INFO
@@ -271,9 +314,12 @@ if ($selectedDevEpos.Count -gt 0) {
 # --- Step 5: confirmation -----------------------------------------------------
 if (-not $NonInteractive) {
     Write-StepHeader -Step 5 -Total 6 -Title 'Confirmation'
-    $plannedEclipseRoot = Resolve-EclipseInstallRoot -InstallPath $InstallPath
+    $plannedEclipseRoot = if ($reuseExistingEclipseRoot) { $reuseExistingEclipseRoot } else { Resolve-EclipseInstallRoot -InstallPath $InstallPath }
     Write-Host "  Eclipse version : $EclipseVersion"
     Write-Host "  Install path    : $plannedEclipseRoot"
+    if ($reuseExistingEclipseRoot) {
+        Write-Host "  Mode            : add to existing installation"
+    }
     Write-Host "  Base package    : $($basePackageEntry.name)"
     Write-Host "  ADT             : $($catalog.adt.name) (always installed)"
     if ($activeDevEposChannel) {
@@ -297,10 +343,15 @@ if (-not $NonInteractive) {
     Write-StepHeader -Step 6 -Total 6 -Title 'Download & install'
 }
 
-$resolvedDownload = Resolve-BasePackageDownload -BasePackageEntry $basePackageEntry -Version $EclipseVersion
+if ($reuseExistingEclipseRoot) {
+    Write-Log "Reusing existing Eclipse installation at '$reuseExistingEclipseRoot' - skipping download and extraction." -Level INFO
+    $eclipseRoot = $reuseExistingEclipseRoot
+} else {
+    $resolvedDownload = Resolve-BasePackageDownload -BasePackageEntry $basePackageEntry -Version $EclipseVersion
 
-$zipPath = Get-CachedFile -Url $resolvedDownload.Url -FallbackUrl $resolvedDownload.FallbackUrl -CacheDirectory $CacheDirectory -FileName $resolvedDownload.ZipFileName
-$eclipseRoot = Expand-EclipseZip -ZipPath $zipPath -InstallPath $InstallPath
+    $zipPath = Get-CachedFile -Url $resolvedDownload.Url -FallbackUrl $resolvedDownload.FallbackUrl -CacheDirectory $CacheDirectory -FileName $resolvedDownload.ZipFileName
+    $eclipseRoot = Expand-EclipseZip -ZipPath $zipPath -InstallPath $InstallPath
+}
 $eclipseExe = Join-Path $eclipseRoot 'eclipsec.exe'
 
 # --- Install ADT (+ required extra repos/IUs) --------------------------------
