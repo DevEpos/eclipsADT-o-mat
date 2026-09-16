@@ -119,7 +119,7 @@ if ($ListFeatures) {
 Initialize-BundlerLog -LogDirectory (Join-Path $scriptRoot 'logs') | Out-Null
 
 if (-not $NonInteractive -and (Test-InteractiveConsole)) {
-    Write-Banner -Title 'eclipsADT-o-Mat' -Subtitle 'Eclipse + ABAP Development Tools'
+    Write-Banner -Title 'eclipsADT-o-Mat' -Subtitle 'Eclipse + ABAP Development Tools + Additional Plugins'
 }
 Write-Log "eclipsADT-o-Mat starting." -Level INFO
 
@@ -184,7 +184,7 @@ if (-not $BasePackage) {
     } else {
         Write-StepHeader -Step 1 -Total 6 -Title 'Base package'
         $defaultIndex = [Math]::Max(0, [Array]::IndexOf(@($catalog.basePackages.id), $defaultBasePackage.id))
-        $chosen = Read-MenuChoice -Title "Select the base Eclipse package to install:" `
+        $chosen = Read-MenuChoice -Title "Select the base Eclipse package to install/modify:" `
             -Options $catalog.basePackages -LabelProperty 'name' -DefaultIndex $defaultIndex
         $BasePackage = $chosen.id
     }

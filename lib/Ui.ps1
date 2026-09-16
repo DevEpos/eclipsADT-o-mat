@@ -79,7 +79,10 @@ function Write-PinnedBanner {
     Write-Host ("╔{0}╗" -f ('═' * $inner)) -ForegroundColor $script:UiTheme.Accent
     Write-Host ("║{0}║" -f $Title.PadLeft(($inner + $Title.Length) / 2).PadRight($inner)) -ForegroundColor $script:UiTheme.Accent
     if ($Subtitle) {
-        Write-Host ("║{0}║" -f $Subtitle.PadLeft(($inner + $Subtitle.Length) / 2).PadRight($inner)) -ForegroundColor $script:UiTheme.Muted
+        $subtitleLine = $Subtitle.PadLeft(($inner + $Subtitle.Length) / 2).PadRight($inner)
+        Write-Host "║" -ForegroundColor $script:UiTheme.Accent -NoNewline
+        Write-Host $subtitleLine -ForegroundColor $script:UiTheme.Muted -NoNewline
+        Write-Host "║" -ForegroundColor $script:UiTheme.Accent
     }
     Write-Host ("╚{0}╝" -f ('═' * $inner)) -ForegroundColor $script:UiTheme.Accent
 }
