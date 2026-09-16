@@ -177,6 +177,12 @@ new Eclipse release train, base package or plugin.
 - **New plugin**: add an entry to `plugins` with `id`, `name`, `description`,
   `category`, `repoUrl` (the plugin's p2 update site) and `installableUnits`
   (the feature group id(s) to install, e.g. `com.example.foo.feature.group`).
+  If the plugin needs Eclipse's Terminal view (absent from the minimal
+  `platform` base package), set `"requiresTerminal": true` instead of adding
+  a fixed terminal feature id - the script resolves the correct id for the
+  selected Eclipse version from the top-level `terminalFeature` entry (Eclipse
+  replaced the old `org.eclipse.tm.terminal` feature with `org.eclipse.terminal`
+  starting with the 2025-09 release train).
 - DevEpos plugins use the channel repository selected in the `devepos.channels`
   section. Do not add a per-plugin DevEpos repository, since mixing channels is
   unsupported.

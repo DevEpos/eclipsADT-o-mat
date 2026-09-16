@@ -119,6 +119,12 @@
     ],
     "required": true
   },
+  "terminalFeature": {
+    "description": "Eclipse's built-in Terminal view feature. Required by GitHub Copilot's terminal tool support, and absent from the minimal 'platform' base package (must be installed explicitly for it, from the matching release train repo). Eclipse renamed/replaced the old Target Management 'org.eclipse.tm.terminal' feature with a new in-platform 'org.eclipse.terminal' feature starting with the 2025-09 release train.",
+    "installableUnit": "org.eclipse.terminal.feature.feature.group",
+    "legacyInstallableUnit": "org.eclipse.tm.terminal.feature.feature.group",
+    "firstVersionWithNewFeature": "2025-09"
+  },
   "devepos": {
     "channels": [
       {
@@ -192,7 +198,7 @@
       "description": "ABAPBlog: Additional commands for ABAP Development Tools.",
       "category": "ABAPBlog",
       "repoUrl": "https://fidley.github.io/ADTPluginsUpdateSite/UpdateSite/",
-      "installableUnits": ["com.abapblog.adt.extensions.feature.feature.group"]
+      "installableUnits": ["com.abapblog.adt.extension.feature.feature.group"]
     },
     {
       "id": "abapblog-vertical-tabs",
@@ -221,11 +227,12 @@
     {
       "id": "github-copilot",
       "name": "GitHub Copilot",
-      "description": "Third-party: GitHub Copilot AI pair programmer integration for Eclipse.",
+      "description": "Third-party: GitHub Copilot AI pair programmer integration for Eclipse. Requires the Eclipse Terminal feature (installed automatically alongside it) for its terminal tool support.",
       "category": "third-party",
       "channel": "stable",
       "repoUrl": "https://azuredownloads-g3ahgwb5b8bkbxhd.b01.azurefd.net/github-copilot/",
-      "installableUnits": ["com.microsoft.copilot.eclipse.feature.feature.group"]
+      "installableUnits": ["com.microsoft.copilot.eclipse.feature.feature.group"],
+      "requiresTerminal": true
     }
   ]
 }

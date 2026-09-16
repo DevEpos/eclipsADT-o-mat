@@ -339,8 +339,21 @@ if (-not $adtResult.Success) {
     }
 
     foreach ($plugin in @($selectedPlugins | Where-Object { $_.category -ne 'devepos' })) {
+        $pluginIUs = @($plugin.installableUnits)
+        if ($plugin.requiresTerminal -and $catalog.terminalFeature) {
+            # Eclipse renamed its Terminal feature starting with the 2025-09 train (see
+            # catalog.json's 'terminalFeature' entry); pick the id matching this version so
+            # plugins like GitHub Copilot (whose terminal tool needs it) resolve correctly,
+            # since it's absent from the minimal 'platform' base package.
+            $terminalIU = if ($EclipseVersion -ge $catalog.terminalFeature.firstVersionWithNewFeature) {
+                $catalog.terminalFeature.installableUnit
+            } else {
+                $catalog.terminalFeature.legacyInstallableUnit
+            }
+            $pluginIUs += $terminalIU
+        }
         $pluginResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($plugin.repoUrl, $releaseTrainRepo) `
-            -InstallIUs $plugin.installableUnits -DestinationPath $eclipseRoot `
+            -InstallIUs $pluginIUs -DestinationPath $eclipseRoot `
             -Description $plugin.name
         $results += [PSCustomObject]@{ Name = $plugin.name; Success = $pluginResult.Success }
     }
