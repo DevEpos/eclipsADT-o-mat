@@ -8,6 +8,7 @@
       "description": "The essential tools for any Java developer: a Java IDE, Git client, XML editor, Maven and Gradle integration.",
       "urlTemplate": "https://www.eclipse.org/downloads/download.php?file=/technology/epp/downloads/release/{version}/R/eclipse-java-{version}-R-win32-x86_64.zip&r=1",
       "fallbackUrlTemplate": "https://archive.eclipse.org/technology/epp/downloads/release/{version}/R/eclipse-java-{version}-R-win32-x86_64.zip",
+      "p2Profile": "epp.package.java",
       "default": true
     },
     {
@@ -15,12 +16,14 @@
       "name": "Eclipse IDE for RCP and RAP Developers",
       "description": "Complete set of tools for developing Eclipse plug-ins, Rich Client Applications and RAP apps, plus Maven/Gradle tooling and an XML editor.",
       "urlTemplate": "https://www.eclipse.org/downloads/download.php?file=/technology/epp/downloads/release/{version}/R/eclipse-rcp-{version}-R-win32-x86_64.zip&r=1",
-      "fallbackUrlTemplate": "https://archive.eclipse.org/technology/epp/downloads/release/{version}/R/eclipse-rcp-{version}-R-win32-x86_64.zip"
+      "fallbackUrlTemplate": "https://archive.eclipse.org/technology/epp/downloads/release/{version}/R/eclipse-rcp-{version}-R-win32-x86_64.zip",
+      "p2Profile": "epp.package.rcp"
     },
     {
       "id": "platform",
       "name": "Eclipse Platform (core runtime only)",
       "description": "Minimal Eclipse runtime with no language tooling; every feature, including ADT itself, must be installed afterwards via p2. Smallest download.",
+      "p2Profile": "SDKProfile",
       "downloads": {
         "2023-03": {
           "url": "https://www.eclipse.org/downloads/download.php?file=/eclipse/downloads/drops4/R-4.27-202303020300/eclipse-platform-4.27-win32-x86_64.zip&r=1",

@@ -237,6 +237,10 @@ if ($NonInteractive) {
             Write-Log "Existing Eclipse at '$existingRoot' is version '$installedVersion' but '$EclipseVersion' was requested. Installation cancelled." -Level ERROR
             exit 1
         }
+        if (-not (Test-ExistingEclipseBasePackage -EclipseRoot $existingRoot -BasePackageEntry $basePackageEntry)) {
+            Write-Log "Existing Eclipse at '$existingRoot' does not match the requested base package '$BasePackage'. Installation cancelled." -Level ERROR
+            exit 1
+        }
         Write-Log "Reusing existing Eclipse ($EclipseVersion) at '$existingRoot'." -Level INFO
         $reuseExistingEclipseRoot = $existingRoot
     }
@@ -270,7 +274,17 @@ if ($NonInteractive) {
             continue
         }
 
-        Write-Host "  Version matches ($EclipseVersion) - ADT and plugins will be added to this installation." -ForegroundColor Green
+        if (-not (Test-ExistingEclipseBasePackage -EclipseRoot $existingRoot -BasePackageEntry $basePackageEntry)) {
+            Write-Host "  The existing installation does not match the selected base package '$($basePackageEntry.name)'." -ForegroundColor Red
+            if (-not (Read-YesNo -Message "  Choose a different folder? (answering no cancels the installation)" -DefaultYes $true)) {
+                Write-Log "Existing Eclipse at '$existingRoot' does not match the requested base package '$BasePackage'. Installation cancelled by user." -Level WARN
+                return
+            }
+            $InstallPath = $null
+            continue
+        }
+
+        Write-Host "  Version and base package match ($EclipseVersion, $($basePackageEntry.name)) - ADT and plugins will be added to this installation." -ForegroundColor Green
         $reuseExistingEclipseRoot = $existingRoot
         break
     }

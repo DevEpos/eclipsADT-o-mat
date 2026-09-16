@@ -121,6 +121,26 @@ function Resolve-EclipseVersionIdFromInstall {
     return $null
 }
 
+function Test-ExistingEclipseBasePackage {
+    <#
+    .SYNOPSIS
+        Returns $true if an existing Eclipse installation's base package (its
+        p2 profile, e.g. 'epp.package.java') matches the chosen base package
+        entry from the catalog.
+    #>
+    param(
+        [Parameter(Mandatory)] [string]$EclipseRoot,
+
+        [Parameter(Mandatory)] $BasePackageEntry
+    )
+
+    if (-not $BasePackageEntry.p2Profile) { return $true }
+
+    $installedProfile = Get-EclipseP2Profile -EclipseInstallPath $EclipseRoot
+    Write-Log "Test-ExistingEclipseBasePackage: detected profile '$installedProfile' at '$EclipseRoot', expected '$($BasePackageEntry.p2Profile)'" -Level DEBUG
+    return $installedProfile -eq $BasePackageEntry.p2Profile
+}
+
 function Save-FileWithProgress {
     <#
     .SYNOPSIS
