@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Data-driven catalog for the ADT Bundler. Update this file to add new Eclipse release trains or new selectable plugins without touching any script logic. See README.md for the schema documentation.",
+  "eclipseDownload": {
+    "urlTemplate": "https://www.eclipse.org/downloads/download.php?file=/technology/epp/downloads/release/{version}/R/eclipse-java-{version}-R-win32-x86_64.zip&r=1",
+    "fallbackUrlTemplate": "https://archive.eclipse.org/technology/epp/downloads/release/{version}/R/eclipse-java-{version}-R-win32-x86_64.zip",
+    "packageName": "Eclipse IDE for Java Developers"
+  },
+  "eclipseVersions": [
+    { "id": "2023-03", "label": "2023-03 (4.27)" },
+    { "id": "2023-06", "label": "2023-06 (4.28)" },
+    { "id": "2023-09", "label": "2023-09 (4.29)" },
+    { "id": "2023-12", "label": "2023-12 (4.30)" },
+    { "id": "2024-03", "label": "2024-03 (4.31)" },
+    { "id": "2024-06", "label": "2024-06 (4.32)" },
+    { "id": "2024-09", "label": "2024-09 (4.33)" },
+    { "id": "2024-12", "label": "2024-12 (4.34)" },
+    { "id": "2025-03", "label": "2025-03 (4.35)" },
+    { "id": "2025-06", "label": "2025-06 (4.36)" },
+    { "id": "2025-09", "label": "2025-09 (4.37)" },
+    { "id": "2025-12", "label": "2025-12 (4.38)" },
+    { "id": "2026-03", "label": "2026-03 (4.39)" },
+    { "id": "2026-06", "label": "2026-06 (4.40)" },
+    { "id": "2026-09", "label": "2026-09 (4.41)" }
+  ],
+  "adt": {
+    "id": "adt-core",
+    "name": "ABAP Development Tools",
+    "description": "SAP's official ABAP Development Tools for Eclipse (required foundation for all ABAP/ADT features, including CDS, DDIC and debugger tooling).",
+    "repoUrlTemplate": "https://tools.hana.ondemand.com/{version}",
+    "additionalRepoUrlTemplates": [
+      "https://download.eclipse.org/releases/{version}"
+    ],
+    "installableUnits": [
+      "com.sap.adt.core.feature.group",
+      "org.eclipse.emf.ecore.feature.group",
+      "org.eclipse.emf.workspace.feature.group",
+      "org.eclipse.emf.databinding.edit.feature.group",
+      "org.eclipse.emf.validation.feature.group"
+    ],
+    "required": true
+  },
+  "plugins": [
+    {
+      "id": "devepos-search-tools",
+      "name": "ABAP Search and Analysis Tools",
+      "description": "DevEpos: Enhanced search and analysis tools for ABAP repository objects.",
+      "category": "devepos",
+      "channel": "stable",
+      "repoUrl": "https://eclipse.devepos.com/latest",
+      "installableUnits": ["com.devepos.adt.searchandanalysistools.feature.group"]
+    },
+    {
+      "id": "devepos-tags",
+      "name": "ABAP Tags",
+      "description": "DevEpos: Tag and organize ABAP repository objects, and search by tag.",
+      "category": "devepos",
+      "channel": "stable",
+      "repoUrl": "https://eclipse.devepos.com/latest",
+      "installableUnits": ["com.devepos.adt.abaptags.feature.group"]
+    },
+    {
+      "id": "devepos-code-search",
+      "name": "ABAP Code Search",
+      "description": "DevEpos: Fast full-text/code search across ABAP repository objects.",
+      "category": "devepos",
+      "channel": "stable",
+      "repoUrl": "https://eclipse.devepos.com/latest",
+      "installableUnits": ["com.devepos.adt.codesearch.feature.group"]
+    },
+    {
+      "id": "devepos-pdt-tools",
+      "name": "PDT Tools (ADT Plugin Development Tools)",
+      "description": "DevEpos: Tooling to support development of ADT plug-ins themselves.",
+      "category": "devepos",
+      "channel": "stable",
+      "repoUrl": "https://eclipse.devepos.com/latest",
+      "installableUnits": ["com.devepos.adt.pdt.feature.group"]
+    },
+    {
+      "id": "github-copilot",
+      "name": "GitHub Copilot",
+      "description": "Third-party: GitHub Copilot AI pair programmer integration for Eclipse.",
+      "category": "third-party",
+      "channel": "stable",
+      "repoUrl": "https://azuredownloads-g3ahgwb5b8bkbxhd.b01.azurefd.net/github-copilot/",
+      "installableUnits": ["com.microsoft.copilot.eclipse.feature.feature.group"]
+    }
+  ]
+}
