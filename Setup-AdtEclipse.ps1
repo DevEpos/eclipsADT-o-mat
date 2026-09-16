@@ -321,9 +321,16 @@ if (-not $adtResult.Success) {
     Write-Log "ADT installation failed - skipping additional plugins since they depend on ADT." -Level ERROR
 } else {
     # --- Install selected plugins --------------------------------------------
+    # Third-party plugins commonly depend on bundles (e.g. org.eclipse.lsp4e,
+    # com.ibm.icu) that ship with the full EPP packages (java/rcp) but are
+    # absent from the minimal 'platform' base package. Always pairing the
+    # plugin's own repo with the matching Eclipse release train repo lets p2
+    # resolve those transitive dependencies regardless of the base package.
+    $releaseTrainRepo = Expand-Template -Template 'https://download.eclipse.org/releases/{version}' -Version $EclipseVersion
+
     if ($selectedDevEpos.Count -gt 0) {
         $deveposIUs = @($selectedDevEpos | ForEach-Object { $_.installableUnits })
-        $deveposResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($activeDevEposChannel.repoUrl) `
+        $deveposResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($activeDevEposChannel.repoUrl, $releaseTrainRepo) `
             -InstallIUs $deveposIUs -DestinationPath $eclipseRoot `
             -Description "DevEpos ($($activeDevEposChannel.id) channel)"
         foreach ($plugin in $selectedDevEpos) {
@@ -332,7 +339,7 @@ if (-not $adtResult.Success) {
     }
 
     foreach ($plugin in @($selectedPlugins | Where-Object { $_.category -ne 'devepos' })) {
-        $pluginResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($plugin.repoUrl) `
+        $pluginResult = Invoke-P2Director -EclipseExePath $eclipseExe -Repositories @($plugin.repoUrl, $releaseTrainRepo) `
             -InstallIUs $plugin.installableUnits -DestinationPath $eclipseRoot `
             -Description $plugin.name
         $results += [PSCustomObject]@{ Name = $plugin.name; Success = $pluginResult.Success }

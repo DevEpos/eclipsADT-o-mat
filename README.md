@@ -194,6 +194,11 @@ new Eclipse release train, base package or plugin.
   entry in `catalog.json`. Check the run's log file under `installer/logs/`
   for the exact missing requirement id, and see if it needs to be added to
   `additionalRepoUrlTemplates`/`installableUnits` for that catalog entry.
+  Note: every third-party plugin install is already paired with the
+  matching `https://download.eclipse.org/releases/<version>` repo (in
+  addition to the plugin's own `repoUrl`) so bundles like
+  `org.eclipse.lsp4e` or `com.ibm.icu` - present in the full EPP packages
+  but missing from the minimal `platform` base package - can still resolve.
 - **Script won't run ("execution of scripts is disabled")**: see the
   Requirements section above.
 - **Slow/failed downloads**: re-run the script - completed downloads are
