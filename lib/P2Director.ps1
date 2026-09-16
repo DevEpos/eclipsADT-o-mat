@@ -80,6 +80,9 @@ function Invoke-P2Director {
 
     .PARAMETER Description
         Human-friendly label used only for logging.
+
+    .PARAMETER RetryCount
+        Number of times to retry after a failed director process. Defaults to 2.
     #>
     param(
         [Parameter(Mandatory)]
@@ -96,7 +99,10 @@ function Invoke-P2Director {
 
         [string]$Profile,
 
-        [string]$Description = ($InstallIUs -join ', ')
+        [string]$Description = ($InstallIUs -join ', '),
+
+        [ValidateRange(0, 2)]
+        [int]$RetryCount = 2
     )
 
     if (-not (Test-Path -LiteralPath $EclipseExePath)) {
@@ -125,33 +131,42 @@ function Invoke-P2Director {
         '-followReferences'
     )
 
-    # Redirect output to temp files so a spinner can tail progress while eclipsec runs.
-    $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("adt-bundler-p2-" + [Guid]::NewGuid().ToString('N'))
-    $stdoutFile = "$tempBase.out.log"
-    $stderrFile = "$tempBase.err.log"
-
-    $spinner = Start-ConsoleSpinner -Activity "Installing $Description"
-    try {
-        $proc = Start-Process -FilePath $EclipseExePath -ArgumentList $directorArgs -NoNewWindow -PassThru `
-            -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
-        while (-not $proc.HasExited) {
-            $lastLine = Get-Content -LiteralPath $stdoutFile -Tail 1 -ErrorAction SilentlyContinue
-            Update-ConsoleSpinner -Spinner $spinner -Status ([string]$lastLine)
-            Start-Sleep -Milliseconds 150
-        }
-        $proc.WaitForExit()
-        $exitCode = $proc.ExitCode
-    } finally {
-        Stop-ConsoleSpinner -Spinner $spinner
-    }
-
     $output = @()
-    foreach ($file in @($stdoutFile, $stderrFile)) {
-        if (Test-Path -LiteralPath $file) {
-            $output += @(Get-Content -LiteralPath $file -ErrorAction SilentlyContinue)
-            Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+    $attempt = 0
+    do {
+        $attempt++
+
+        # Redirect output to temp files so a spinner can tail progress while eclipsec runs.
+        $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("adt-bundler-p2-" + [Guid]::NewGuid().ToString('N'))
+        $stdoutFile = "$tempBase.out.log"
+        $stderrFile = "$tempBase.err.log"
+
+        $spinner = Start-ConsoleSpinner -Activity "Installing $Description (attempt $attempt/$($RetryCount + 1))"
+        try {
+            $proc = Start-Process -FilePath $EclipseExePath -ArgumentList $directorArgs -NoNewWindow -PassThru `
+                -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+            while (-not $proc.HasExited) {
+                $lastLine = Get-Content -LiteralPath $stdoutFile -Tail 1 -ErrorAction SilentlyContinue
+                Update-ConsoleSpinner -Spinner $spinner -Status ([string]$lastLine)
+                Start-Sleep -Milliseconds 150
+            }
+            $proc.WaitForExit()
+            $exitCode = $proc.ExitCode
+        } finally {
+            Stop-ConsoleSpinner -Spinner $spinner
         }
-    }
+
+        foreach ($file in @($stdoutFile, $stderrFile)) {
+            if (Test-Path -LiteralPath $file) {
+                $output += @(Get-Content -LiteralPath $file -ErrorAction SilentlyContinue)
+                Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        if ($exitCode -ne 0 -and $attempt -le $RetryCount) {
+            Write-Log "Installation attempt $attempt failed for $Description (exit code $exitCode); retrying." -Level WARN
+        }
+    } while ($exitCode -ne 0 -and $attempt -le $RetryCount)
 
     if ($exitCode -eq 0) {
         Write-Log "Installed successfully: $Description" -Level SUCCESS
