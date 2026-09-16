@@ -149,8 +149,13 @@ if ($NonInteractive) {
 # --- Step 4: confirmation -----------------------------------------------------
 if (-not $NonInteractive) {
     Write-StepHeader -Step 4 -Total 5 -Title 'Confirmation'
+    $plannedEclipseRoot = if (Test-Path -LiteralPath $InstallPath -PathType Container) {
+        Join-Path $InstallPath 'eclipse'
+    } else {
+        $InstallPath
+    }
     Write-Host "  Eclipse version : $EclipseVersion"
-    Write-Host "  Install path    : $InstallPath\eclipse"
+    Write-Host "  Install path    : $plannedEclipseRoot"
     Write-Host "  Base package    : $($catalog.eclipseDownload.packageName)"
     Write-Host "  ADT             : $($catalog.adt.name) (always installed)"
     if ($selectedPlugins.Count -gt 0) {

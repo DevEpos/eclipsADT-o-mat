@@ -43,7 +43,8 @@ remain visible.
 You'll be prompted for:
 1. The Eclipse release train to install (e.g. `2025-06`) - the latest
    supported version is preselected.
-2. The install directory (an `eclipse` subfolder is created there).
+2. The install directory. If it already exists, Eclipse is placed in an
+  `eclipse` subfolder; a new directory is used as the Eclipse root.
 3. Which additional plugins to install alongside ADT (multi-select: toggle a
    number, `a` = all, `n` = none, Enter to confirm).
 
@@ -70,7 +71,7 @@ without installing anything:
 
 | Parameter          | Description                                                                 |
 |---------------------|-------------------------------------------------------------------------------|
-| `-InstallPath`      | Target directory (an `eclipse` subfolder is created inside it). Defaults to `.\eclipse-adt`. |
+| `-InstallPath`      | Target directory. An `eclipse` subfolder is used only when the target already exists. Defaults to `.\eclipse-adt`. |
 | `-EclipseVersion`   | Eclipse release train id, e.g. `2025-06`. Required with `-NonInteractive`.   |
 | `-Features`         | Array of plugin ids from `catalog.json` to install (non-interactive mode only). |
 | `-NonInteractive`   | Suppresses all prompts.                                                      |

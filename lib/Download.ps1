@@ -158,19 +158,26 @@ function Expand-EclipseZip {
         [string]$InstallPath
     )
 
-    if (-not (Test-Path -LiteralPath $InstallPath)) {
-        New-Item -ItemType Directory -Force -Path $InstallPath | Out-Null
+    $targetExists = Test-Path -LiteralPath $InstallPath -PathType Container
+    $eclipseRoot = if ($targetExists) {
+        Join-Path $InstallPath 'eclipse'
+    } else {
+        $InstallPath
     }
 
-    $eclipseExe = Join-Path $InstallPath 'eclipse\eclipse.exe'
+    if (-not (Test-Path -LiteralPath $eclipseRoot)) {
+        New-Item -ItemType Directory -Force -Path $eclipseRoot | Out-Null
+    }
+
+    $eclipseExe = Join-Path $eclipseRoot 'eclipse.exe'
     if (Test-Path -LiteralPath $eclipseExe) {
-        Write-Log "Eclipse already extracted at '$InstallPath\eclipse', skipping extraction." -Level INFO
-        return (Join-Path $InstallPath 'eclipse')
+        Write-Log "Eclipse already extracted at '$eclipseRoot', skipping extraction." -Level INFO
+        return $eclipseRoot
     }
 
-    Write-Log "Extracting '$ZipPath' to '$InstallPath' ..." -Level INFO
+    Write-Log "Extracting '$ZipPath' to '$eclipseRoot' ..." -Level INFO
 
-    $destRoot = (Resolve-Path -LiteralPath $InstallPath).Path.TrimEnd('\', '/')
+    $destRoot = (Resolve-Path -LiteralPath $eclipseRoot).Path.TrimEnd('\', '/')
     $showProgress = Test-InteractiveConsole
     $zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
     try {
@@ -179,13 +186,14 @@ function Expand-EclipseZip {
         $done = 0
         foreach ($entry in $entries) {
             $done++
-            $targetPath = [System.IO.Path]::GetFullPath((Join-Path $destRoot $entry.FullName))
+            $relativePath = $entry.FullName -replace '^eclipse[\\/]', ''
+            $targetPath = [System.IO.Path]::GetFullPath((Join-Path $destRoot $relativePath))
             # Guard against zip-slip: every entry must stay inside the destination.
             if (-not $targetPath.StartsWith($destRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase) -and
                 $targetPath -ne $destRoot) {
                 throw "Zip entry '$($entry.FullName)' would extract outside the destination directory."
             }
-            if ([string]::IsNullOrEmpty($entry.Name)) {
+            if ([string]::IsNullOrEmpty($relativePath)) {
                 # Directory entry
                 [void][System.IO.Directory]::CreateDirectory($targetPath)
             } else {
@@ -206,5 +214,5 @@ function Expand-EclipseZip {
     }
 
     Write-Log "Eclipse extracted successfully." -Level SUCCESS
-    return (Join-Path $InstallPath 'eclipse')
+    return $eclipseRoot
 }
