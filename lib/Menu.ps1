@@ -239,7 +239,7 @@ function Read-MultiSelect {
         Optional property name to display as a secondary description line.
 
     .PARAMETER GroupProperty
-        Optional property name used to group options under muted category
+        Optional property name used to group options under muted publisher
         headers (interactive mode only).
 
     .PARAMETER PreSelectedIndices

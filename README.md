@@ -187,7 +187,7 @@ new Eclipse release train, base package or plugin.
   package follows the EPP release naming pattern) or a `downloads` map (for
   packages needing per-version URLs).
 - **New plugin**: add an entry to `plugins` with `id`, `name`, `description`,
-  `category`, `repoUrl` (the plugin's p2 update site) and `installableUnits`
+  `publisher`, `repoUrl` (the plugin's p2 update site) and `installableUnits`
   (the feature group id(s) to install, e.g. `com.example.foo.feature.group`).
   If the plugin needs Eclipse's Terminal view (absent from the minimal
   `platform` base package), set `"requiresTerminal": true` instead of adding

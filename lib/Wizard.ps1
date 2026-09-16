@@ -186,7 +186,7 @@ function Resolve-PluginSelection {
     } else {
         Write-StepHeader -Step 4 -Total 6 -Title 'Additional plugins'
         $selectedPlugins = Read-MultiSelect -Title "Select additional plugins to install (ADT itself is always installed):" `
-            -Options $Catalog.plugins -LabelProperty 'name' -DescriptionProperty 'description' -GroupProperty 'category'
+            -Options $Catalog.plugins -LabelProperty 'name' -DescriptionProperty 'description' -GroupProperty 'publisher'
     }
     Write-Log "Selected plugins: $(($selectedPlugins.id) -join ', ')" -Level DEBUG
     return $selectedPlugins
@@ -205,7 +205,7 @@ function Resolve-DevEposChannel {
         [switch]$NonInteractive
     )
 
-    $selectedDevEpos = @($SelectedPlugins | Where-Object { $_.category -eq 'devepos' })
+    $selectedDevEpos = @($SelectedPlugins | Where-Object { $_.publisher -eq 'DevEpos' })
     if ($selectedDevEpos.Count -eq 0) { return $null }
 
     if (-not $Catalog.devepos -or -not $Catalog.devepos.channels) {
@@ -337,7 +337,7 @@ function Install-AdtAndPlugins {
     # resolve those transitive dependencies regardless of the base package.
     $releaseTrainRepo = Expand-Template -Template 'https://download.eclipse.org/releases/{version}' -Version $EclipseVersion
 
-    $selectedDevEpos = @($SelectedPlugins | Where-Object { $_.category -eq 'devepos' })
+    $selectedDevEpos = @($SelectedPlugins | Where-Object { $_.publisher -eq 'DevEpos' })
     if ($selectedDevEpos.Count -gt 0) {
         $deveposIUs = @($selectedDevEpos | ForEach-Object { $_.installableUnits })
         Write-Log "DevEpos installable units: $($deveposIUs -join ', ')" -Level DEBUG
@@ -349,7 +349,7 @@ function Install-AdtAndPlugins {
         }
     }
 
-    foreach ($plugin in @($SelectedPlugins | Where-Object { $_.category -ne 'devepos' })) {
+    foreach ($plugin in @($SelectedPlugins | Where-Object { $_.publisher -ne 'DevEpos' })) {
         $pluginIUs = @($plugin.installableUnits)
         if ($plugin.requiresTerminal -and $Catalog.terminalFeature) {
             # Eclipse renamed its Terminal feature starting with the 2025-09 train (see

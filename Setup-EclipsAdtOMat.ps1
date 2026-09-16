@@ -113,9 +113,9 @@ if ($ListFeatures) {
     $catalog.eclipseVersions | ForEach-Object { Write-Host ("  {0,-9} {1}" -f $_.id, $_.label) }
     Write-Host ""
     Write-Host "Available plugins:" -ForegroundColor Cyan
-    Write-Host ("  {0,-26} {1,-12} {2}" -f 'ID', 'CATEGORY', 'NAME') -ForegroundColor DarkGray
+    Write-Host ("  {0,-26} {1,-12} {2}" -f 'ID', 'PUBLISHER', 'NAME') -ForegroundColor DarkGray
     $catalog.plugins | ForEach-Object {
-        Write-Host ("  {0,-26} {1,-12} {2}" -f $_.id, $_.category, $_.name)
+        Write-Host ("  {0,-26} {1,-12} {2}" -f $_.id, $_.publisher, $_.name)
     }
     return
 }
