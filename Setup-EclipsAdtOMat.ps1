@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-    ADT Bundler - downloads a chosen Eclipse release, installs SAP's ABAP
+    eclipsADT-o-Mat - downloads a chosen Eclipse release, installs SAP's ABAP
     Development Tools (ADT), and lets you pick additional DevEpos / third
     party ADT plugins, all headlessly via the Eclipse p2 director.
 
@@ -48,7 +48,7 @@
 
 .PARAMETER CacheDirectory
     Directory used to cache the downloaded Eclipse zip so re-runs don't
-    re-download it. Defaults to '%LOCALAPPDATA%\AdtBundler\cache'.
+    re-download it. Defaults to '%LOCALAPPDATA%\eclipsADT-o-Mat\cache'.
 
 .PARAMETER ListFeatures
     Prints the catalog's available Eclipse versions and plugins, then exits
@@ -78,7 +78,7 @@ param(
 
     [switch]$NonInteractive,
 
-    [string]$CacheDirectory = (Join-Path $env:LOCALAPPDATA 'AdtBundler\cache'),
+    [string]$CacheDirectory = (Join-Path $env:LOCALAPPDATA 'eclipsADT-o-Mat\cache'),
 
     [switch]$ListFeatures
 )
@@ -119,9 +119,9 @@ if ($ListFeatures) {
 Initialize-BundlerLog -LogDirectory (Join-Path $scriptRoot 'logs') | Out-Null
 
 if (-not $NonInteractive -and (Test-InteractiveConsole)) {
-    Write-Banner -Title 'ADT Bundler' -Subtitle 'Eclipse + ABAP Development Tools'
+    Write-Banner -Title 'eclipsADT-o-Mat' -Subtitle 'Eclipse + ABAP Development Tools'
 }
-Write-Log "ADT Bundler starting." -Level INFO
+Write-Log "eclipsADT-o-Mat starting." -Level INFO
 
 if ($NonInteractive -and -not $EclipseVersion) {
     throw "-NonInteractive requires -EclipseVersion to be specified (use -ListFeatures to see available versions)."
@@ -375,11 +375,11 @@ Write-Host ""
 
 if ($anyFailed) {
     Write-Log "Completed with failures. See log for details." -Level ERROR
-    Show-DesktopNotification -Title 'ADT Bundler' -Message 'Installation completed with failures. See the log for details.' -Icon Error
+    Show-DesktopNotification -Title 'eclipsADT-o-Mat' -Message 'Installation completed with failures. See the log for details.' -Icon Error
     exit 1
 }
 
 Write-Log "All done. Launch Eclipse from: $eclipseRoot\eclipse.exe" -Level SUCCESS
 Write-Host "Eclipse with ADT is ready at: $eclipseRoot\eclipse.exe" -ForegroundColor Green
-Show-DesktopNotification -Title 'ADT Bundler' -Message "Installation finished. Launch Eclipse from: $eclipseRoot\eclipse.exe"
+Show-DesktopNotification -Title 'eclipsADT-o-Mat' -Message "Installation finished. Launch Eclipse from: $eclipseRoot\eclipse.exe"
 exit 0

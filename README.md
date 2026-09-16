@@ -1,11 +1,24 @@
-# eclipse ADT Bundler
+# eclipsADT-o-Mat
 
 A Windows PowerShell wizard that builds you a ready-to-use ABAP development
 environment: it downloads a chosen Eclipse release, installs SAP's
 [ABAP Development Tools (ADT)](https://tools.hana.ondemand.com/#abap), and
-lets you pick additional ADT features to install alongside it - this repo's
-own [DevEpos features](../README.md) plus a small curated list of well-known
-third-party ADT extensions.
+lets you pick additional ADT features to install alongside it:
+
+| Name                                    | Publisher | URL                                                                                     |
+|------------------------------------------|-----------|------------------------------------------------------------------------------------------|
+| ABAP Search and Analysis Tools           | DevEpos   | https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/search-tools           |
+| ABAP Tags                                | DevEpos   | https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/tags                   |
+| ABAP Code Search                         | DevEpos   | https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/code-search            |
+| PDT Tools (ADT Plugin Development Tools) | DevEpos   | https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/pdt-tools              |
+| ABAP cleaner                             | SAP       | https://github.com/SAP/abap-cleaner                                                      |
+| ABAP Favorites                           | ABAPBlog  | https://github.com/fidley/ABAPFavorites                                                  |
+| ABAP Quick Fix                           | ABAPBlog  | https://github.com/fidley/ABAPQuickFix                                                   |
+| ADT Classic Outline                      | ABAPBlog  | https://github.com/fidley/ADT-Classic-Outline-Frontend                                   |
+| ADT Extensions - Commands                | ABAPBlog  | https://github.com/fidley/ABAP-Project-Extensions                                        |
+| Vertical Tabs                            | ABAPBlog  | https://github.com/fidley/VerticalTabs                                                   |
+| Vertical Tabs ABAP Specific Features     | ABAPBlog  | https://github.com/fidley/VerticalTabs                                                   |
+| GitHub Copilot                           | Microsoft | https://github.com/microsoft/copilot-for-eclipse/                                        |
 
 It is a lightweight alternative to an Eclipse Installer/Oomph setup: no
 external tooling is required beyond PowerShell and the Eclipse package itself
@@ -21,7 +34,7 @@ external tooling is required beyond PowerShell and the Eclipse package itself
   you may need to allow the script to run, e.g.:
 
   ```shell
-  pwsh -ExecutionPolicy Bypass -File .\Setup-AdtEclipse.ps1
+  pwsh -ExecutionPolicy Bypass -File .\Setup-EclipsAdtOMat.ps1
   ```
 
   or once per user session: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.
@@ -31,12 +44,11 @@ external tooling is required beyond PowerShell and the Eclipse package itself
 ### Interactive wizard
 
 ```shell
-cd installer
-.\Setup-AdtEclipse.ps1
+.\Setup-EclipsAdtOMat.ps1
 ```
 
 You can also start the wizard from Windows Explorer by double-clicking
-`Start-AdtEclipse.cmd`. It opens PowerShell 7, runs from the installer folder,
+`Start-EclipsAdtOMat.cmd`. It opens PowerShell 7, runs from the repo folder,
 and keeps the console window open after the run so errors and the log location
 remain visible.
 
@@ -56,8 +68,8 @@ You'll be prompted for:
   Eclipse root.
 4. Which additional plugins to install alongside ADT (multi-select: toggle a
    number, `a` = all, `n` = none, Enter to confirm).
-5. Which DevEpos channel to use for all selected DevEpos plugins: `dev` or
-  `latest`.
+5. If you selected any DevEpos plugin: which DevEpos channel to use for all
+   selected DevEpos plugins: `dev` or `latest`.
 
 The wizard then downloads the matching base Eclipse package (cached locally
 so re-runs don't re-download it), extracts it, and runs the Eclipse p2
@@ -66,7 +78,7 @@ director headlessly to install ADT and your chosen plugins.
 ### Unattended / scripted usage
 
 ```shell
-.\Setup-AdtEclipse.ps1 -NonInteractive -BasePackage java -EclipseVersion 2026-09 `
+.\Setup-EclipsAdtOMat.ps1 -NonInteractive -BasePackage java -EclipseVersion 2026-09 `
     -InstallPath C:\dev\eclipse-adt `
     -Features devepos-search-tools,devepos-tags
 ```
@@ -82,7 +94,7 @@ Use `-ListFeatures` to print all available base packages, Eclipse versions and
 plugin ids without installing anything:
 
 ```shell
-.\Setup-AdtEclipse.ps1 -ListFeatures
+.\Setup-EclipsAdtOMat.ps1 -ListFeatures
 ```
 
 ### Parameters
@@ -95,24 +107,24 @@ plugin ids without installing anything:
 | `-Features`         | Array of plugin ids from `catalog.json` to install (non-interactive mode only). |
 | `-DevEposChannel`   | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`). |
 | `-NonInteractive`   | Suppresses all prompts.                                                      |
-| `-CacheDirectory`   | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\AdtBundler\cache`. |
+| `-CacheDirectory`   | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\eclipsADT-o-Mat\cache`. |
 | `-ListFeatures`     | Prints the catalog contents and exits.                                       |
 
 ## How it works / architecture
 
 ```shell
-installer/
-  Setup-AdtEclipse.ps1   # main wizard entry point (interactive + unattended)
-  Start-AdtEclipse.cmd   # Explorer-friendly launcher for the interactive wizard
-  catalog.json            # data-driven catalog: base packages, Eclipse versions,
-                           # ADT repo(s) + installable units, DevEpos channels/plugins
-                           # + third-party plugins
-  lib/
-    Download.ps1           # cache-aware download + Eclipse zip extraction
-    P2Director.ps1          # wrapper around eclipsec.exe's p2 director
-    Menu.ps1                # console menu / multi-select prompt helpers
-    Logging.ps1             # console + file logging
-  logs/                     # created at runtime, one log file per run
+Setup-EclipsAdtOMat.ps1   # main wizard entry point (interactive + unattended)
+Start-EclipsAdtOMat.cmd   # Explorer-friendly launcher for the interactive wizard
+catalog.json            # data-driven catalog: base packages, Eclipse versions,
+                         # ADT repo(s) + installable units, DevEpos channels/plugins
+                         # + third-party plugins
+lib/
+  Download.ps1           # cache-aware download + Eclipse zip extraction
+  P2Director.ps1          # wrapper around eclipsec.exe's p2 director
+  Menu.ps1                # console menu / multi-select prompt helpers
+  Logging.ps1             # console + file logging
+  Ui.ps1                  # banner, theming, spinner, notifications
+logs/                     # created at runtime, one log file per run
 ```
 
 Under the hood, the wizard downloads the official Eclipse "Java Developers"
@@ -197,7 +209,7 @@ new Eclipse release train, base package or plugin.
 - **"Cannot complete the install... could not be found"**: usually means the
   Eclipse release train and the ADT/plugin repo versions don't correspond, or
   a transitive dependency isn't available from the repos listed for that
-  entry in `catalog.json`. Check the run's log file under `installer/logs/`
+  entry in `catalog.json`. Check the run's log file under `logs/`
   for the exact missing requirement id, and see if it needs to be added to
   `additionalRepoUrlTemplates`/`installableUnits` for that catalog entry.
   Note: every third-party plugin install is already paired with the

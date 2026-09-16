@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Download/cache/extract helpers for the ADT Bundler.
+    Download/cache/extract helpers for eclipsADT-o-Mat.
 
 .DESCRIPTION
     Get-CachedFile downloads a file to a local cache directory (skipping the

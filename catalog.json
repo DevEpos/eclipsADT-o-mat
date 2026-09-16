@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Data-driven catalog for the ADT Bundler. Update this file to add new Eclipse release trains or new selectable plugins without touching any script logic. See README.md for the schema documentation.",
+  "description": "Data-driven catalog for eclipsADT-o-Mat. Update this file to add new Eclipse release trains or new selectable plugins without touching any script logic. See README.md for the schema documentation.",
   "basePackages": [
     {
       "id": "java",

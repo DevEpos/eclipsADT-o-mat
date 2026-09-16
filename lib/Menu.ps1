@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Console menu / prompt helpers shared by the ADT Bundler wizard.
+    Console menu / prompt helpers shared by the eclipsADT-o-Mat wizard.
 
 .DESCRIPTION
     Provides dependency-free helpers (requires lib\Ui.ps1 to be dot-sourced

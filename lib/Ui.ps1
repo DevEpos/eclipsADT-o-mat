@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Shared console UI helpers for the ADT Bundler: interactivity detection,
+    Shared console UI helpers for eclipsADT-o-Mat: interactivity detection,
     theme, banner, step headers and a polling-based spinner.
 
 .DESCRIPTION

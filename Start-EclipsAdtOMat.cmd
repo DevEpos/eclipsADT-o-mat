@@ -11,12 +11,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Setup-AdtEclipse.ps1" %*
+pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Setup-EclipsAdtOMat.ps1" %*
 set "exitCode=%ERRORLEVEL%"
 
 if not "%exitCode%"=="0" (
     echo.
-    echo The ADT Bundler exited with code %exitCode%.
+    echo eclipsADT-o-Mat exited with code %exitCode%.
 )
 pause
 exit /b %exitCode%

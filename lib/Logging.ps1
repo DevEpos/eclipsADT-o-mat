@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Minimal logging helpers shared by the ADT Bundler scripts.
+    Minimal logging helpers shared by eclipsADT-o-Mat scripts.
 
 .DESCRIPTION
     Provides Write-Log for console + optional log-file output and
@@ -22,7 +22,7 @@ function Initialize-BundlerLog {
 
     $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $script:BundlerLogFilePath = Join-Path $LogDirectory "adt-bundler-$timestamp.log"
-    "ADT Bundler log started $(Get-Date -Format 'u')" | Out-File -FilePath $script:BundlerLogFilePath -Encoding utf8
+    "eclipsADT-o-Mat log started $(Get-Date -Format 'u')" | Out-File -FilePath $script:BundlerLogFilePath -Encoding utf8
     return $script:BundlerLogFilePath
 }
 

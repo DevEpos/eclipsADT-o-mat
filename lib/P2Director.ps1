@@ -8,7 +8,7 @@
     to install one or more installable units (feature groups) from one or more
     p2 repositories into an existing Eclipse installation's profile.
 
-    Notes learned from manual verification (see installer/README.md):
+    Notes learned from manual verification (see README.md):
     - The p2 profile of an "Eclipse IDE for Java Developers" package is
       'epp.package.java' (not 'SDKProfile').
     - ADT's version-specific p2 repo (https://tools.hana.ondemand.com/<version>)
