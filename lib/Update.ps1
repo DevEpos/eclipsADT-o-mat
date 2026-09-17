@@ -155,8 +155,25 @@ function Invoke-GitSourceUpdate {
         [string]$ScriptRoot
     )
 
+    # A pull neither fixes nor always rejects locally modified tracked files, so
+    # discard them first - the caller already confirmed they may be overwritten.
+    $dirty = @(git -C $ScriptRoot status --porcelain 2>&1 | Where-Object { $_ -notmatch '^\?\?' })
+    if ($LASTEXITCODE -ne 0) {
+        Write-Log "git status failed (exit $LASTEXITCODE): $($dirty | Select-Object -Last 1)" -Level WARN
+        return $false
+    }
+    if ($dirty.Count -gt 0) {
+        Write-Log "Discarding local changes to $($dirty.Count) tracked file(s): $(($dirty | ForEach-Object { ($_ -replace '^.{3}', '') }) -join ', ')" -Level WARN
+        $resetOutput = git -C $ScriptRoot reset --hard --quiet 2>&1
+        $resetOutput | ForEach-Object { Write-Log "git: $_" -Level DEBUG }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "git reset failed (exit $LASTEXITCODE): $($resetOutput | Select-Object -Last 1)" -Level WARN
+            return $false
+        }
+    }
+
     Write-Log "Updating sources via 'git pull --ff-only'..." -Level INFO
-    # --ff-only avoids surprise merges; local modifications cause a clean failure instead.
+    # --ff-only avoids surprise merges; diverged local commits cause a clean failure instead.
     $output = git -C $ScriptRoot pull --ff-only 2>&1
     $output | ForEach-Object { Write-Log "git: $_" -Level DEBUG }
     if ($LASTEXITCODE -ne 0) {

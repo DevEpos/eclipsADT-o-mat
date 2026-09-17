@@ -132,8 +132,9 @@ Extra local files (logs, caches) are never deleted, but local modifications to
 tracked files are overwritten when an update is applied.
 
 If the sources are a git clone and git is installed, the update is applied via
-`git pull --ff-only` instead of a zip download; if the pull fails (e.g. due to
-local commits or modifications), the zip download is used as fallback.
+`git pull --ff-only`; local modifications to tracked files are discarded first
+(they would be overwritten by the update anyway). If the pull still fails
+(e.g. due to diverged local commits), the zip download is used as fallback.
 
 ## How it works / architecture
 
