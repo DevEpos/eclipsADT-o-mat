@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # The bundled script targets Windows (e.g. $env:LOCALAPPDATA defaults), so smoke test there.
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
 
