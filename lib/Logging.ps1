@@ -21,7 +21,7 @@ function Initialize-BundlerLog {
     }
 
     $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $script:BundlerLogFilePath = Join-Path $LogDirectory "adt-bundler-$timestamp.log"
+    $script:BundlerLogFilePath = Join-Path $LogDirectory "eclipsadt-o-mat-$timestamp.log"
     "eclipsADT-o-Mat log started $(Get-Date -Format 'u')" | Out-File -FilePath $script:BundlerLogFilePath -Encoding utf8
     return $script:BundlerLogFilePath
 }

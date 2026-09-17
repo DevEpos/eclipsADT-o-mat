@@ -68,7 +68,7 @@ function Invoke-ProcessWithSpinnerCapture {
     )
 
     # Redirect output to temp files so the spinner can tail progress while the process runs.
-    $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("adt-bundler-p2-" + [Guid]::NewGuid().ToString('N'))
+    $tempBase = Join-Path ([System.IO.Path]::GetTempPath()) ("eclipsadt-o-mat-p2-" + [Guid]::NewGuid().ToString('N'))
     $stdoutFile = "$tempBase.out.log"
     $stderrFile = "$tempBase.err.log"
 
