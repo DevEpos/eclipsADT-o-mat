@@ -51,11 +51,17 @@ function Resolve-BasePackageDownload {
         $fallbackUrl = $entry.fallbackUrl
     } else {
         $url = Expand-Template -Template $BasePackageEntry.urlTemplate -Version $Version
-        $fallbackUrl = Expand-Template -Template $BasePackageEntry.fallbackUrlTemplate -Version $Version
+        $fallbackUrl = if ($BasePackageEntry.fallbackUrlTemplate) { Expand-Template -Template $BasePackageEntry.fallbackUrlTemplate -Version $Version } else { $null }
     }
 
-    # Derive the cache file name from the (query-string free) fallback URL's leaf segment.
-    $zipFileName = Split-Path -Leaf ([uri]$fallbackUrl).AbsolutePath
+    if ($fallbackUrl) {
+        # Derive the cache file name from the (query-string free) fallback URL's leaf segment.
+        $zipFileName = Split-Path -Leaf ([uri]$fallbackUrl).AbsolutePath
+    } else {
+        # No fallback URL - extract the real file name from the primary URL's 'file' query parameter instead.
+        $fileParam = [regex]::Match(([uri]$url).Query, '[?&]file=([^&]+)').Groups[1].Value
+        $zipFileName = Split-Path -Leaf ([uri]::UnescapeDataString($fileParam))
+    }
 
     Write-Log "Resolve-BasePackageDownload: url='$url' fallbackUrl='$fallbackUrl' zipFileName='$zipFileName'" -Level DEBUG
     return [PSCustomObject]@{ Url = $url; FallbackUrl = $fallbackUrl; ZipFileName = $zipFileName }

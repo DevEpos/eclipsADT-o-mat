@@ -1,0 +1,39 @@
+name: Check for new Eclipse release
+
+on:
+  schedule:
+    # 06:00 UTC on the 1st and 5th of March, June, September, December
+    - cron: '0 6 1,2,3,5 3,6,9,12 *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check for new Eclipse release
+        id: check
+        shell: pwsh
+        run: ./lib/EclipseReleaseCheck.ps1
+
+      - name: Create pull request
+        if: steps.check.outputs.updated == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: eclipse-release/${{ steps.check.outputs.version }}
+          delete-branch: true
+          commit-message: 'chore: add Eclipse ${{ steps.check.outputs.version }} release'
+          title: 'chore: add Eclipse ${{ steps.check.outputs.version }} release'
+          body: |
+            Automatically detected a new Eclipse simultaneous release train.
+
+            Adds `${{ steps.check.outputs.version }}` to `catalog.json`'s `eclipseVersions`
+            and the matching `platform` base package download URLs.
+
+            Please verify the generated download URLs before merging.
