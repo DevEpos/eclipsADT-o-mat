@@ -114,12 +114,29 @@ plugin ids without installing anything:
 | `-NonInteractive` | Suppresses all prompts.                                                                                            |
 | `-CacheDirectory` | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\eclipsADT-o-Mat\cache`.                      |
 | `-ListFeatures`   | Prints the catalog contents and exits.                                                                             |
+| `-SkipUpdateCheck` | Skips the startup check for updated sources on GitHub (also skipped with `-NonInteractive`).                      |
+
+### Updating the sources
+
+On startup, the wizard checks whether the local sources (`catalog.json`,
+scripts) differ from the GitHub repository and offers to update them. This
+works without git - installations downloaded as a zip are supported as well.
+The check can also be run standalone:
+
+```shell
+.\Update-EclipsAdtOMat.ps1          # check, list changed files, ask before updating
+.\Update-EclipsAdtOMat.ps1 -Force   # update without confirmation
+```
+
+Extra local files (logs, caches) are never deleted, but local modifications to
+tracked files are overwritten when an update is applied.
 
 ## How it works / architecture
 
 ```shell
 Setup-EclipsAdtOMat.ps1   # main wizard entry point (interactive + unattended)
 Start-EclipsAdtOMat.cmd   # Explorer-friendly launcher for the interactive wizard
+Update-EclipsAdtOMat.ps1  # updates the local sources from GitHub
 catalog.json            # data-driven catalog: base packages, Eclipse versions,
                          # ADT repo(s) + installable units, DevEpos channels/plugins
                          # + third-party plugins
@@ -129,6 +146,7 @@ lib/
   Menu.ps1                # console menu / multi-select prompt helpers
   Logging.ps1             # console + file logging
   Ui.ps1                  # banner, theming, spinner, notifications
+  Update.ps1              # GitHub source comparison + self-update
 logs/                     # created at runtime, one log file per run
 ```
 

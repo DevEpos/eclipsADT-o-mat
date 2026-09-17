@@ -54,6 +54,11 @@
     Prints the catalog's available Eclipse versions and plugins, then exits
     without installing anything.
 
+.PARAMETER SkipUpdateCheck
+    Skips the startup check whether the local sources (catalog.json, scripts)
+    differ from the GitHub repository. The check is also skipped in
+    -NonInteractive mode.
+
 .EXAMPLE
     .\Setup-AdtEclipse.ps1
     Runs the full interactive wizard.
@@ -80,7 +85,9 @@ param(
 
     [string]$CacheDirectory = (Join-Path $env:LOCALAPPDATA 'eclipsADT-o-Mat\cache'),
 
-    [switch]$ListFeatures
+    [switch]$ListFeatures,
+
+    [switch]$SkipUpdateCheck
 )
 
 $ErrorActionPreference = 'Stop'
@@ -94,6 +101,7 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptRoot 'lib\Menu.ps1')
 . (Join-Path $scriptRoot 'lib\Catalog.ps1')
 . (Join-Path $scriptRoot 'lib\Wizard.ps1')
+. (Join-Path $scriptRoot 'lib\Update.ps1')
 
 $catalogPath = Join-Path $scriptRoot 'catalog.json'
 if (-not (Test-Path -LiteralPath $catalogPath)) {
@@ -127,6 +135,26 @@ if (-not $NonInteractive -and (Test-InteractiveConsole)) {
     Write-Banner -Title 'eclipsADT-o-Mat' -Subtitle 'Installer for Eclipse + ABAP Development Tools + Additional Plugins'
 }
 Write-Log "eclipsADT-o-Mat starting." -Level INFO
+
+# --- Update check --------------------------------------------------------------
+if (-not $SkipUpdateCheck -and -not $NonInteractive) {
+    $changedFiles = Test-SourceUpdateAvailable -ScriptRoot $scriptRoot
+    if ($changedFiles -and $changedFiles.Count -gt 0) {
+        Write-Log "An update is available: $($changedFiles.Count) file(s) differ from GitHub ($($changedFiles -join ', '))" -Level DEBUG
+        Write-UpdateNotice -ChangedFiles $changedFiles
+        if (Read-YesNo "Update local sources now? (local changes to these files will be overwritten)") {
+            if (Invoke-SourceUpdate -ScriptRoot $scriptRoot) {
+                Write-Log "Restarting wizard with updated sources..." -Level INFO
+                Write-Host ""
+                $restartParams = @{} + $PSBoundParameters
+                $restartParams['SkipUpdateCheck'] = $true
+                & $PSCommandPath @restartParams
+                exit $LASTEXITCODE
+            }
+            Write-Log "Continuing with the existing local sources." -Level WARN
+        }
+    }
+}
 
 if ($NonInteractive -and -not $EclipseVersion) {
     throw "-NonInteractive requires -EclipseVersion to be specified (use -ListFeatures to see available versions)."
