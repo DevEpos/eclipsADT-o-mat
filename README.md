@@ -214,7 +214,7 @@ eclipsec.exe -application org.eclipse.equinox.p2.director ^
   `additionalRepoUrlTemplates` and the extra entries in `installableUnits`).
 
 This was all verified end-to-end against real Eclipse/ADT release pairs
-(2023-09, 2024-12, 2026-09): full ADT install and a DevEpos feature both
+(2024-09, 2024-12, 2026-09): full ADT install and a DevEpos feature both
 install successfully into a fresh "Eclipse IDE for Java Developers"
 download with no manual repository configuration beyond what's already in
 `catalog.json`.
