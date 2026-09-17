@@ -134,10 +134,45 @@ function Write-UpdateNotice {
     Write-Host ""
 }
 
+function Test-GitUpdateSupported {
+    <#
+    .SYNOPSIS
+        Returns $true when the sources are a git clone (.git folder present)
+        and a git executable is available, so 'git pull' can be used.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$ScriptRoot
+    )
+
+    if (-not (Test-Path -LiteralPath (Join-Path $ScriptRoot '.git'))) { return $false }
+    return $null -ne (Get-Command git -ErrorAction SilentlyContinue)
+}
+
+function Invoke-GitSourceUpdate {
+    param(
+        [Parameter(Mandatory)]
+        [string]$ScriptRoot
+    )
+
+    Write-Log "Updating sources via 'git pull --ff-only'..." -Level INFO
+    # --ff-only avoids surprise merges; local modifications cause a clean failure instead.
+    $output = git -C $ScriptRoot pull --ff-only 2>&1
+    $output | ForEach-Object { Write-Log "git: $_" -Level DEBUG }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Log "git pull failed (exit $LASTEXITCODE): $($output | Select-Object -Last 1)" -Level WARN
+        return $false
+    }
+    Write-Log "Local sources updated via git pull ($script:UpdateRepoOwner/$script:UpdateRepoName@$script:UpdateRepoBranch)." -Level SUCCESS
+    return $true
+}
+
 function Invoke-SourceUpdate {
     <#
     .SYNOPSIS
-        Downloads the branch zipball from GitHub and overwrites the local
+        Updates the local sources from GitHub. Uses 'git pull' when the
+        sources are a git clone and git is installed; otherwise (or if the
+        pull fails) downloads the branch zipball and overwrites the local
         sources. Extra local files (logs, caches) are left untouched.
         Returns $true on success.
     #>
@@ -145,6 +180,11 @@ function Invoke-SourceUpdate {
         [Parameter(Mandatory)]
         [string]$ScriptRoot
     )
+
+    if (Test-GitUpdateSupported -ScriptRoot $ScriptRoot) {
+        if (Invoke-GitSourceUpdate -ScriptRoot $ScriptRoot) { return $true }
+        Write-Log "Falling back to zip download." -Level WARN
+    }
 
     $zipUrl = "https://github.com/$script:UpdateRepoOwner/$script:UpdateRepoName/archive/refs/heads/$($script:UpdateRepoBranch).zip"
     $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "eclipsADT-o-Mat-update-$([System.IO.Path]::GetRandomFileName())"
