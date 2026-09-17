@@ -297,9 +297,16 @@ function Resolve-EclipseInstallation {
 function Install-AdtAndPlugins {
     <#
     .SYNOPSIS
-        Step 6b: installs ADT (required), then any selected DevEpos and
+        Step 6b: installs ADT (required) plus any selected DevEpos and
         third-party plugins, via the p2 director. Returns an array of
         [PSCustomObject]@{ Name; Success } results for the summary step.
+
+    .DESCRIPTION
+        Builds one repository/IU set per logical item (ADT, DevEpos channel,
+        each third-party plugin) and first tries a single combined p2 director
+        call for everything. Only if that fails does it fall back to running
+        each item's own director call sequentially (Install-ItemsSequentially),
+        so the summary can still pinpoint which specific item broke.
     #>
     param(
         [Parameter(Mandatory)] $Catalog,
@@ -316,19 +323,6 @@ function Install-AdtAndPlugins {
             $adtRepos += (Expand-Template -Template $tmpl -Version $EclipseVersion)
         }
     }
-    Write-Log "ADT repositories: $($adtRepos -join ', ')" -Level DEBUG
-
-    $results = @()
-    Write-Log "ADT installable units: $($Catalog.adt.installableUnits -join ', ')" -Level DEBUG
-    $adtResult = Invoke-P2Director -EclipseExePath $EclipseExePath -Repositories $adtRepos `
-        -InstallIUs $Catalog.adt.installableUnits -DestinationPath $EclipseRoot `
-        -Description $Catalog.adt.name
-    $results += [PSCustomObject]@{ Name = $Catalog.adt.name; Success = $adtResult.Success }
-
-    if (-not $adtResult.Success) {
-        Write-Log "ADT installation failed - skipping additional plugins since they depend on ADT." -Level ERROR
-        return $results
-    }
 
     # Third-party plugins commonly depend on bundles (e.g. org.eclipse.lsp4e,
     # com.ibm.icu) that ship with the full EPP packages (java/rcp) but are
@@ -337,15 +331,18 @@ function Install-AdtAndPlugins {
     # resolve those transitive dependencies regardless of the base package.
     $releaseTrainRepo = Expand-Template -Template 'https://download.eclipse.org/releases/{version}' -Version $EclipseVersion
 
+    $items = @([PSCustomObject]@{
+        ResultNames = @($Catalog.adt.name)
+        Repos       = $adtRepos
+        IUs         = $Catalog.adt.installableUnits
+    })
+
     $selectedDevEpos = @($SelectedPlugins | Where-Object { $_.publisher -eq 'DevEpos' })
     if ($selectedDevEpos.Count -gt 0) {
-        $deveposIUs = @($selectedDevEpos | ForEach-Object { $_.installableUnits })
-        Write-Log "DevEpos installable units: $($deveposIUs -join ', ')" -Level DEBUG
-        $deveposResult = Invoke-P2Director -EclipseExePath $EclipseExePath -Repositories @($ActiveDevEposChannel.repoUrl, $releaseTrainRepo) `
-            -InstallIUs $deveposIUs -DestinationPath $EclipseRoot `
-            -Description "DevEpos ($($ActiveDevEposChannel.id) channel)"
-        foreach ($plugin in $selectedDevEpos) {
-            $results += [PSCustomObject]@{ Name = $plugin.name; Success = $deveposResult.Success }
+        $items += [PSCustomObject]@{
+            ResultNames = @($selectedDevEpos | ForEach-Object { $_.name })
+            Repos       = @($ActiveDevEposChannel.repoUrl, $releaseTrainRepo)
+            IUs         = @($selectedDevEpos | ForEach-Object { $_.installableUnits })
         }
     }
 
@@ -363,14 +360,67 @@ function Install-AdtAndPlugins {
             }
             $pluginIUs += $terminalIU
         }
-        Write-Log "Plugin '$($plugin.name)' installable units: $($pluginIUs -join ', ')" -Level DEBUG
         # repoUrl is optional: some features (e.g. Eclipse Marketplace Client) ship as
         # part of the release train repo itself and need no dedicated update site.
         $pluginRepos = @($plugin.repoUrl, $releaseTrainRepo) | Where-Object { $_ }
-        $pluginResult = Invoke-P2Director -EclipseExePath $EclipseExePath -Repositories $pluginRepos `
-            -InstallIUs $pluginIUs -DestinationPath $EclipseRoot `
-            -Description $plugin.name
-        $results += [PSCustomObject]@{ Name = $plugin.name; Success = $pluginResult.Success }
+        $items += [PSCustomObject]@{ ResultNames = @($plugin.name); Repos = $pluginRepos; IUs = $pluginIUs }
+    }
+
+    foreach ($item in $items) {
+        Write-Log "Item '$($item.ResultNames -join ', ')' repositories: $($item.Repos -join ', ')" -Level DEBUG
+        Write-Log "Item '$($item.ResultNames -join ', ')' installable units: $($item.IUs -join ', ')" -Level DEBUG
+    }
+
+    $combinedRepos = @($items.Repos | Select-Object -Unique)
+    $combinedIUs = @($items.IUs | Select-Object -Unique)
+
+    # Fail fast (no retries) on the combined attempt: a failure here falls back
+    # to per-item calls anyway, so retrying the whole bundle first would just
+    # delay reaching the granular diagnostics.
+    $combinedResult = Invoke-P2Director -EclipseExePath $EclipseExePath -Repositories $combinedRepos `
+        -InstallIUs $combinedIUs -DestinationPath $EclipseRoot `
+        -Description 'ADT + selected plugins' -RetryCount 0
+
+    if ($combinedResult.Success) {
+        return @($items | ForEach-Object {
+            $item = $_
+            $item.ResultNames | ForEach-Object { [PSCustomObject]@{ Name = $_; Success = $true } }
+        })
+    }
+
+    Write-Log "Combined installation failed - falling back to per-item installs to identify the culprit." -Level WARN
+    return (Install-ItemsSequentially -Items $items -EclipseExePath $EclipseExePath -EclipseRoot $EclipseRoot)
+}
+
+function Install-ItemsSequentially {
+    <#
+    .SYNOPSIS
+        Fallback for Install-AdtAndPlugins: installs each item (ADT, DevEpos
+        channel, third-party plugin) via its own p2 director call, so the
+        summary can pinpoint which specific item failed.
+
+    .DESCRIPTION
+        The first item is assumed to be ADT; if it fails, the remaining items
+        are skipped since they all depend on it.
+    #>
+    param(
+        [Parameter(Mandatory)] [object[]]$Items,
+        [Parameter(Mandatory)] [string]$EclipseExePath,
+        [Parameter(Mandatory)] [string]$EclipseRoot
+    )
+
+    $results = @()
+    for ($i = 0; $i -lt $Items.Count; $i++) {
+        $item = $Items[$i]
+        $itemResult = Invoke-P2Director -EclipseExePath $EclipseExePath -Repositories $item.Repos `
+            -InstallIUs $item.IUs -DestinationPath $EclipseRoot -Description ($item.ResultNames -join ', ')
+        foreach ($name in $item.ResultNames) {
+            $results += [PSCustomObject]@{ Name = $name; Success = $itemResult.Success }
+        }
+        if ($i -eq 0 -and -not $itemResult.Success) {
+            Write-Log "ADT installation failed - skipping additional plugins since they depend on ADT." -Level ERROR
+            break
+        }
     }
 
     return $results
