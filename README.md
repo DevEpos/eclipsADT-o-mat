@@ -23,6 +23,7 @@ lets you pick additional ADT features to install alongside it:
 | Vertical Tabs ABAP Specific Features     | ABAPBlog           | <https://github.com/fidley/VerticalTabs>                                         |
 | GitHub Copilot                           | Microsoft          | <https://github.com/microsoft/copilot-for-eclipse/>                              |
 | Eclipse Marketplace Client               | Eclipse Foundation | <https://marketplace.eclipse.org/>                                               |
+| Enhanced Class Decompiler                | Pascal Bihler      | <https://ecd-plugin.github.io/> (requires the RCP base package)                  |
 
 It is a lightweight alternative to an Eclipse Installer/Oomph setup: no
 external tooling is required beyond PowerShell and the Eclipse package itself
@@ -123,17 +124,17 @@ plugin ids without installing anything:
 
 ### Parameters
 
-| Parameter         | Description                                                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `-InstallPath`    | Target directory. An `eclipse` subfolder is used only when the target already exists. Defaults to `.\eclipse-adt`. |
-| `-BasePackage`    | Base Eclipse package id from `catalog.json`: `java` (default), `rcp` or `platform`.                                |
-| `-EclipseVersion` | Eclipse release train id, e.g. `2026-09`. Required with `-NonInteractive`. Must be supported by `-BasePackage`.    |
-| `-Features`       | Array of plugin ids from `catalog.json` to install (non-interactive mode only).                                    |
-| `-DevEposChannel` | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`).                           |
-| `-NonInteractive` | Suppresses all prompts.                                                                                            |
-| `-CacheDirectory` | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\eclipsADT-o-Mat\cache`.                      |
-| `-ListFeatures`   | Prints the catalog contents and exits.                                                                             |
-| `-SkipUpdateCheck` | Skips the startup check for updated sources on GitHub (also skipped with `-NonInteractive`).                      |
+| Parameter          | Description                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `-InstallPath`     | Target directory. An `eclipse` subfolder is used only when the target already exists. Defaults to `.\eclipse-adt`. |
+| `-BasePackage`     | Base Eclipse package id from `catalog.json`: `java` (default), `rcp` or `platform`.                                |
+| `-EclipseVersion`  | Eclipse release train id, e.g. `2026-09`. Required with `-NonInteractive`. Must be supported by `-BasePackage`.    |
+| `-Features`        | Array of plugin ids from `catalog.json` to install (non-interactive mode only).                                    |
+| `-DevEposChannel`  | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`).                           |
+| `-NonInteractive`  | Suppresses all prompts.                                                                                            |
+| `-CacheDirectory`  | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\eclipsADT-o-Mat\cache`.                      |
+| `-ListFeatures`    | Prints the catalog contents and exits.                                                                             |
+| `-SkipUpdateCheck` | Skips the startup check for updated sources on GitHub (also skipped with `-NonInteractive`).                       |
 
 ### Updating the sources
 
@@ -253,6 +254,10 @@ new Eclipse release train, base package or plugin.
   selected Eclipse version from the top-level `terminalFeature` entry (Eclipse
   replaced the old `org.eclipse.tm.terminal` feature with `org.eclipse.terminal`
   starting with the 2025-09 release train).
+  If the plugin only works with certain base packages, set `"requiresBasePackage"`
+  to an array of the allowed base package id(s) (e.g. `["rcp"]`) - it is then
+  hidden from the interactive multi-select and rejected via `-Features` unless
+  a matching base package was chosen.
 - DevEpos plugins use the channel repository selected in the `devepos.channels`
   section. Do not add a per-plugin DevEpos repository, since mixing channels is
   unsupported.

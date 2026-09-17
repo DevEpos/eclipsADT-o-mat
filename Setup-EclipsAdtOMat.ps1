@@ -131,7 +131,8 @@ if ($ListFeatures) {
     Write-Host "Available plugins:" -ForegroundColor Cyan
     Write-Host ("  {0,-26} {1,-12} {2}" -f 'ID', 'PUBLISHER', 'NAME') -ForegroundColor DarkGray
     $catalog.plugins | ForEach-Object {
-        Write-Host ("  {0,-26} {1,-12} {2}" -f $_.id, $_.publisher, $_.name)
+        $restriction = if ($_.requiresBasePackage) { " (requires base package: $($_.requiresBasePackage -join ', '))" } else { '' }
+        Write-Host ("  {0,-26} {1,-12} {2}{3}" -f $_.id, $_.publisher, $_.name, $restriction)
     }
     return
 }
@@ -206,7 +207,7 @@ $reuseExistingEclipseRoot = $installLocation.ReuseExistingEclipseRoot
 # @() guards against PowerShell unrolling an empty result to $null, which would
 # otherwise make downstream "$SelectedPlugins | Where-Object { ... }" pipelines
 # treat $null itself as a phantom selected plugin.
-$selectedPlugins = @(Resolve-PluginSelection -Catalog $catalog -Features $Features -NonInteractive:$NonInteractive)
+$selectedPlugins = @(Resolve-PluginSelection -Catalog $catalog -BasePackageEntry $basePackageEntry -Features $Features -NonInteractive:$NonInteractive)
 $activeDevEposChannel = Resolve-DevEposChannel -Catalog $catalog -SelectedPlugins $selectedPlugins -DevEposChannel $DevEposChannel -NonInteractive:$NonInteractive
 
 # --- Step 5: confirmation -----------------------------------------------------

@@ -241,6 +241,22 @@
       "description": "Eclipse Foundation: Browse and install plugins from the Eclipse Marketplace directly within Eclipse. Ships as part of the standard release train repository, so no dedicated update site is needed.",
       "publisher": "Eclipse Foundation",
       "installableUnits": ["org.eclipse.epp.mpc.feature.group"]
+    },
+    {
+      "id": "enhanced-class-decompiler",
+      "name": "Enhanced Class Decompiler",
+      "description": "Pascal Bihler: Decompiles Java class files inside Eclipse, bundled with the CFR, Fernflower, JD-Core, Procyon and Vineflower decompiler engines. Requires the Eclipse IDE for RCP and RAP Developers base package.",
+      "publisher": "Pascal Bihler",
+      "repoUrl": "https://ecd-plugin.github.io/update",
+      "installableUnits": [
+        "org.sf.feeling.decompiler.feature.group",
+        "org.sf.feeling.decompiler.cfr.feature.group",
+        "org.sf.feeling.decompiler.fernflower.feature.group",
+        "org.sf.feeling.decompiler.jd.feature.group",
+        "org.sf.feeling.decompiler.procyon.feature.group",
+        "org.sf.feeling.decompiler.vineflower.feature.group"
+      ],
+      "requiresBasePackage": ["rcp"]
     }
   ]
 }

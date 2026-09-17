@@ -166,13 +166,20 @@ function Resolve-PluginSelection {
     <#
     .SYNOPSIS
         Step 4: resolves the additional plugins to install, either from
-        -Features (non-interactive) or via the multi-select menu.
+        -Features (non-interactive) or via the multi-select menu. Plugins
+        restricted to specific base packages (via `requiresBasePackage`) are
+        only offered/accepted when the matching base package was selected.
     #>
     param(
         [Parameter(Mandatory)] $Catalog,
+        [Parameter(Mandatory)] $BasePackageEntry,
         [string[]]$Features,
         [switch]$NonInteractive
     )
+
+    $availablePlugins = @($Catalog.plugins | Where-Object {
+        -not $_.requiresBasePackage -or $_.requiresBasePackage -contains $BasePackageEntry.id
+    })
 
     $selectedPlugins = @()
     if ($NonInteractive) {
@@ -180,13 +187,16 @@ function Resolve-PluginSelection {
             foreach ($featureId in $Features) {
                 $plugin = $Catalog.plugins | Where-Object { $_.id -eq $featureId }
                 if (-not $plugin) { throw "Unknown feature id '$featureId'. Run with -ListFeatures to see valid values." }
+                if ($plugin.requiresBasePackage -and $plugin.requiresBasePackage -notcontains $BasePackageEntry.id) {
+                    throw "Plugin '$featureId' requires base package '$($plugin.requiresBasePackage -join ', ')', but '$($BasePackageEntry.id)' was selected."
+                }
                 $selectedPlugins += $plugin
             }
         }
     } else {
         Write-StepHeader -Step 4 -Total 6 -Title 'Additional plugins'
         $selectedPlugins = Read-MultiSelect -Title "Select additional plugins to install (ADT itself is always installed):" `
-            -Options $Catalog.plugins -LabelProperty 'name' -DescriptionProperty 'description' -GroupProperty 'publisher'
+            -Options $availablePlugins -LabelProperty 'name' -DescriptionProperty 'description' -GroupProperty 'publisher'
     }
     Write-Log "Selected plugins: $(($selectedPlugins.id) -join ', ')" -Level DEBUG
     return $selectedPlugins
