@@ -364,7 +364,10 @@ function Install-AdtAndPlugins {
             $pluginIUs += $terminalIU
         }
         Write-Log "Plugin '$($plugin.name)' installable units: $($pluginIUs -join ', ')" -Level DEBUG
-        $pluginResult = Invoke-P2Director -EclipseExePath $EclipseExePath -Repositories @($plugin.repoUrl, $releaseTrainRepo) `
+        # repoUrl is optional: some features (e.g. Eclipse Marketplace Client) ship as
+        # part of the release train repo itself and need no dedicated update site.
+        $pluginRepos = @($plugin.repoUrl, $releaseTrainRepo) | Where-Object { $_ }
+        $pluginResult = Invoke-P2Director -EclipseExePath $EclipseExePath -Repositories $pluginRepos `
             -InstallIUs $pluginIUs -DestinationPath $EclipseRoot `
             -Description $plugin.name
         $results += [PSCustomObject]@{ Name = $plugin.name; Success = $pluginResult.Success }

@@ -236,6 +236,13 @@
       "publisher": "ABAPBlog",
       "repoUrl": "https://fidley.github.io/VerticalTabs/",
       "installableUnits": ["com.abapblog.verticaltabs.abap.feature.feature.group"]
+    },
+    {
+      "id": "eclipse-marketplace-client",
+      "name": "Eclipse Marketplace Client",
+      "description": "Eclipse Foundation: Browse and install plugins from the Eclipse Marketplace directly within Eclipse. Ships as part of the standard release train repository, so no dedicated update site is needed.",
+      "publisher": "Eclipse Foundation",
+      "installableUnits": ["org.eclipse.epp.mpc.feature.group"]
     }
   ]
 }

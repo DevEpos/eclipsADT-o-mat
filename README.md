@@ -8,20 +8,21 @@ lets you pick additional ADT features to install alongside it:
 > See the [step-by-step walkthrough](docs/walkthrough.md) for a visual tour
 > of the wizard.
 
-| Name                                     | Publisher | URL                                                                              |
-| ---------------------------------------- | --------- | -------------------------------------------------------------------------------- |
-| ABAP Search and Analysis Tools           | DevEpos   | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/search-tools> |
-| ABAP Tags                                | DevEpos   | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/tags>         |
-| ABAP Code Search                         | DevEpos   | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/code-search>  |
-| PDT Tools (ADT Plugin Development Tools) | DevEpos   | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/pdt-tools>    |
-| ABAP cleaner                             | SAP       | <https://github.com/SAP/abap-cleaner>                                            |
-| ABAP Favorites                           | ABAPBlog  | <https://github.com/fidley/ABAPFavorites>                                        |
-| ABAP Quick Fix                           | ABAPBlog  | <https://github.com/fidley/ABAPQuickFix>                                         |
-| ADT Classic Outline                      | ABAPBlog  | <https://github.com/fidley/ADT-Classic-Outline-Frontend>                         |
-| ADT Extensions - Commands                | ABAPBlog  | <https://github.com/fidley/ABAP-Project-Extensions>                              |
-| Vertical Tabs                            | ABAPBlog  | <https://github.com/fidley/VerticalTabs>                                         |
-| Vertical Tabs ABAP Specific Features     | ABAPBlog  | <https://github.com/fidley/VerticalTabs>                                         |
-| GitHub Copilot                           | Microsoft | <https://github.com/microsoft/copilot-for-eclipse/>                              |
+| Name                                     | Publisher          | URL                                                                              |
+| ---------------------------------------- | ------------------ | -------------------------------------------------------------------------------- |
+| ABAP Search and Analysis Tools           | DevEpos            | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/search-tools> |
+| ABAP Tags                                | DevEpos            | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/tags>         |
+| ABAP Code Search                         | DevEpos            | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/code-search>  |
+| PDT Tools (ADT Plugin Development Tools) | DevEpos            | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/pdt-tools>    |
+| ABAP cleaner                             | SAP                | <https://github.com/SAP/abap-cleaner>                                            |
+| ABAP Favorites                           | ABAPBlog           | <https://github.com/fidley/ABAPFavorites>                                        |
+| ABAP Quick Fix                           | ABAPBlog           | <https://github.com/fidley/ABAPQuickFix>                                         |
+| ADT Classic Outline                      | ABAPBlog           | <https://github.com/fidley/ADT-Classic-Outline-Frontend>                         |
+| ADT Extensions - Commands                | ABAPBlog           | <https://github.com/fidley/ABAP-Project-Extensions>                              |
+| Vertical Tabs                            | ABAPBlog           | <https://github.com/fidley/VerticalTabs>                                         |
+| Vertical Tabs ABAP Specific Features     | ABAPBlog           | <https://github.com/fidley/VerticalTabs>                                         |
+| GitHub Copilot                           | Microsoft          | <https://github.com/microsoft/copilot-for-eclipse/>                              |
+| Eclipse Marketplace Client               | Eclipse Foundation | <https://marketplace.eclipse.org/>                                               |
 
 It is a lightweight alternative to an Eclipse Installer/Oomph setup: no
 external tooling is required beyond PowerShell and the Eclipse package itself
@@ -193,6 +194,10 @@ new Eclipse release train, base package or plugin.
 - **New plugin**: add an entry to `plugins` with `id`, `name`, `description`,
   `publisher`, `repoUrl` (the plugin's p2 update site) and `installableUnits`
   (the feature group id(s) to install, e.g. `com.example.foo.feature.group`).
+  `repoUrl` may be omitted if the feature ships as part of the standard
+  `https://download.eclipse.org/releases/<version>` release train repo
+  already paired with every plugin install (e.g. the Eclipse Marketplace
+  Client).
   If the plugin needs Eclipse's Terminal view (absent from the minimal
   `platform` base package), set `"requiresTerminal": true` instead of adding
   a fixed terminal feature id - the script resolves the correct id for the
