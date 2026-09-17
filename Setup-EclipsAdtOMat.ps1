@@ -173,7 +173,10 @@ $InstallPath = $installLocation.InstallPath
 $reuseExistingEclipseRoot = $installLocation.ReuseExistingEclipseRoot
 
 # --- Step 4: plugin selection -------------------------------------------------
-$selectedPlugins = Resolve-PluginSelection -Catalog $catalog -Features $Features -NonInteractive:$NonInteractive
+# @() guards against PowerShell unrolling an empty result to $null, which would
+# otherwise make downstream "$SelectedPlugins | Where-Object { ... }" pipelines
+# treat $null itself as a phantom selected plugin.
+$selectedPlugins = @(Resolve-PluginSelection -Catalog $catalog -Features $Features -NonInteractive:$NonInteractive)
 $activeDevEposChannel = Resolve-DevEposChannel -Catalog $catalog -SelectedPlugins $selectedPlugins -DevEposChannel $DevEposChannel -NonInteractive:$NonInteractive
 
 # --- Step 5: confirmation -----------------------------------------------------
