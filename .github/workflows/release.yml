@@ -19,17 +19,22 @@ jobs:
         shell: pwsh
         run: ./build/New-Bundle.ps1 -Version '${{ github.ref_name }}' -OutputPath dist/eclipsADT-o-mat.ps1
 
-      - name: Smoke test bundled script
+      - name: Smoke test bundled scripts
         shell: pwsh
+        env:
+          ECLIPSADT_NO_PAUSE: '1'
         run: |
           ./dist/eclipsADT-o-mat.ps1 -ListFeatures
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmd /c "dist\eclipsADT-o-mat.cmd -ListFeatures"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
           gh release create '${{ github.ref_name }}'
+          'dist/eclipsADT-o-mat.cmd'
           'dist/eclipsADT-o-mat.ps1'
           --title '${{ github.ref_name }}'
           --generate-notes

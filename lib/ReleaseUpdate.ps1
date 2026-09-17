@@ -13,6 +13,21 @@
 $script:ReleaseRepoOwner = 'DevEpos'
 $script:ReleaseRepoName = 'eclipsADT-o-mat'
 $script:ReleaseAssetName = 'eclipsADT-o-mat.ps1'
+$script:ReleaseCmdAssetName = 'eclipsADT-o-mat.cmd'
+
+function Get-ReleaseAssetName {
+    <#
+    .SYNOPSIS
+        Returns the release asset name matching the given update target: the
+        .cmd launcher asset for .cmd targets, the plain .ps1 otherwise.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$TargetPath
+    )
+
+    return ([System.IO.Path]::GetExtension($TargetPath) -eq '.cmd') ? $script:ReleaseCmdAssetName : $script:ReleaseAssetName
+}
 
 function ConvertTo-ReleaseVersion {
     <#
@@ -39,7 +54,9 @@ function Get-LatestRelease {
         or $null if it cannot be determined (offline, rate-limited, no
         release, missing asset, ...).
     #>
-    param()
+    param(
+        [string]$AssetName = $script:ReleaseAssetName
+    )
 
     $uri = "https://api.github.com/repos/$script:ReleaseRepoOwner/$script:ReleaseRepoName/releases/latest"
     try {
@@ -52,9 +69,9 @@ function Get-LatestRelease {
         return $null
     }
 
-    $asset = @($response.assets) | Where-Object { $_.name -eq $script:ReleaseAssetName } | Select-Object -First 1
+    $asset = @($response.assets) | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1
     if (-not $asset) {
-        Write-Log "Update check: release '$($response.tag_name)' has no '$script:ReleaseAssetName' asset." -Level DEBUG
+        Write-Log "Update check: release '$($response.tag_name)' has no '$AssetName' asset." -Level DEBUG
         return $null
     }
 
@@ -72,10 +89,12 @@ function Test-ReleaseUpdateAvailable {
     #>
     param(
         [Parameter(Mandatory)]
-        [string]$CurrentVersion
+        [string]$CurrentVersion,
+
+        [string]$AssetName = $script:ReleaseAssetName
     )
 
-    $release = Get-LatestRelease
+    $release = Get-LatestRelease -AssetName $AssetName
     if (-not $release) { return $null }
 
     $current = ConvertTo-ReleaseVersion -Tag $CurrentVersion
@@ -128,15 +147,19 @@ function Invoke-ReleaseSelfUpdate {
         $Release
     )
 
-    $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) "eclipsADT-o-Mat-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $extension = [System.IO.Path]::GetExtension($ScriptPath)
+    if (-not $extension) { $extension = '.ps1' }
+    $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) "eclipsADT-o-Mat-$([System.IO.Path]::GetRandomFileName())$extension"
     try {
         Write-Log "Downloading $($Release.Tag) from $($Release.AssetUrl)" -Level INFO
         Save-FileWithProgress -Url $Release.AssetUrl -Destination $tempFile -DisplayName "eclipsADT-o-Mat $($Release.Tag)"
 
         # Refuse to replace the running script with something that doesn't even parse.
+        # The .cmd launcher's batch header is a PowerShell comment, so both variants parse.
         $tokens = $null
         $parseErrors = $null
-        [System.Management.Automation.Language.Parser]::ParseFile($tempFile, [ref]$tokens, [ref]$parseErrors) | Out-Null
+        $content = Get-Content -LiteralPath $tempFile -Raw
+        [System.Management.Automation.Language.Parser]::ParseInput($content, [ref]$tokens, [ref]$parseErrors) | Out-Null
         if ($parseErrors -and $parseErrors.Count -gt 0) {
             throw "Downloaded script has $($parseErrors.Count) parse error(s); keeping the current version."
         }
@@ -150,6 +173,35 @@ function Invoke-ReleaseSelfUpdate {
     } finally {
         if (Test-Path -LiteralPath $tempFile) {
             Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Invoke-UpdatedScript {
+    <#
+    .SYNOPSIS
+        Runs the updated script with the given parameters and returns its exit
+        code. A .cmd launcher target is staged as a temp .ps1 first (its batch
+        header is a PowerShell comment, so the payload runs unchanged).
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$UpdateTarget,
+
+        [hashtable]$Parameters = @{}
+    )
+
+    $runPath = $UpdateTarget
+    if ([System.IO.Path]::GetExtension($UpdateTarget) -eq '.cmd') {
+        $runPath = Join-Path ([System.IO.Path]::GetTempPath()) "eclipsADT-o-Mat-restart-$([System.IO.Path]::GetRandomFileName()).ps1"
+        Copy-Item -LiteralPath $UpdateTarget -Destination $runPath -Force
+    }
+    try {
+        & $runPath @Parameters
+        return ($LASTEXITCODE ?? 0)
+    } finally {
+        if ($runPath -ne $UpdateTarget) {
+            Remove-Item -LiteralPath $runPath -Force -ErrorAction SilentlyContinue
         }
     }
 }

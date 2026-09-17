@@ -47,16 +47,22 @@ external tooling is required beyond PowerShell and the Eclipse package itself
 
 ### Single-file download (recommended)
 
-Download `eclipsADT-o-mat.ps1` from the
-[latest release](https://github.com/DevEpos/eclipsADT-o-mat/releases/latest) -
-it bundles all scripts and the catalog into one file - and run it:
+Download `eclipsADT-o-mat.cmd` from the
+[latest release](https://github.com/DevEpos/eclipsADT-o-mat/releases/latest)
+and **double-click it** - no command line and no execution-policy setup
+needed (the launcher starts PowerShell 7 with `-ExecutionPolicy Bypass`
+itself; only [PowerShell 7](https://aka.ms/powershell) must be installed).
+It bundles all scripts and the catalog into one file.
+
+Prefer a plain PowerShell script? Download `eclipsADT-o-mat.ps1` instead and
+run:
 
 ```shell
 pwsh -ExecutionPolicy Bypass -File .\eclipsADT-o-mat.ps1
 ```
 
-On startup it checks GitHub for a newer release and offers to update itself
-in place. All parameters described below work identically.
+On startup both variants check GitHub for a newer release and offer to update
+themselves in place. All parameters described below work identically.
 
 ### Interactive wizard
 

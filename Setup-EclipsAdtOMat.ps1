@@ -150,17 +150,18 @@ Write-Log ("eclipsADT-o-Mat starting." + ($script:DistributionVersion ? " (versi
 if (-not $SkipUpdateCheck -and -not $NonInteractive) {
     if ($script:DistributionVersion) {
         # Single-file release: compare against the latest GitHub release and replace this script.
-        $release = Test-ReleaseUpdateAvailable -CurrentVersion $script:DistributionVersion
+        # When started via the .cmd launcher, update the launcher file, not the temp copy pwsh runs.
+        $updateTarget = $env:ECLIPSADT_LAUNCHER ? $env:ECLIPSADT_LAUNCHER : $PSCommandPath
+        $release = Test-ReleaseUpdateAvailable -CurrentVersion $script:DistributionVersion -AssetName (Get-ReleaseAssetName -TargetPath $updateTarget)
         if ($release) {
             Write-ReleaseUpdateNotice -Release $release -CurrentVersion $script:DistributionVersion
             if (Read-YesNo "Update to $($release.Tag) now?") {
-                if (Invoke-ReleaseSelfUpdate -ScriptPath $PSCommandPath -Release $release) {
+                if (Invoke-ReleaseSelfUpdate -ScriptPath $updateTarget -Release $release) {
                     Write-Log "Restarting wizard with the updated version..." -Level INFO
                     Write-Host ""
                     $restartParams = @{} + $PSBoundParameters
                     $restartParams['SkipUpdateCheck'] = $true
-                    & $PSCommandPath @restartParams
-                    exit $LASTEXITCODE
+                    exit (Invoke-UpdatedScript -UpdateTarget $updateTarget -Parameters $restartParams)
                 }
                 Write-Log "Continuing with the current version." -Level WARN
             }

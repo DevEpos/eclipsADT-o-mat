@@ -1,14 +1,16 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-    Builds the single-file release distribution of eclipsADT-o-Mat.
+    Builds the single-file release distributions of eclipsADT-o-Mat.
 
 .DESCRIPTION
     Takes Setup-EclipsAdtOMat.ps1 and produces one self-contained script by
     - inlining every dot-sourced lib/*.ps1 file (bundled-libs region),
     - embedding catalog.json as a here-string (bundled-catalog region),
     - injecting the release tag into $script:DistributionVersion.
-    The result is parse-validated before it is written.
+    The result is parse-validated before it is written. A double-clickable
+    .cmd polyglot variant (batch launcher header + same payload) is written
+    alongside the .ps1.
 
 .PARAMETER Version
     Release tag to embed, e.g. 'v1.0.0'. Must be a (v-prefixed) semver.
@@ -122,3 +124,41 @@ if ($outputDir -and -not (Test-Path -LiteralPath $outputDir)) {
 }
 [System.IO.File]::WriteAllText($OutputPath, $text, [System.Text.UTF8Encoding]::new($true))
 Write-Host "Wrote $OutputPath ($([math]::Round((Get-Item -LiteralPath $OutputPath).Length / 1KB)) KB)" -ForegroundColor Green
+
+# --- Double-clickable .cmd polyglot -----------------------------------------------
+# cmd.exe runs the batch header (no execution policy applies) and relaunches the
+# file's own content via pwsh; PowerShell sees the header as a <# comment #>.
+$cmdHeaderLines = @(
+    '<# : eclipsADT-o-Mat launcher - the batch header below is a PowerShell comment.'
+    '@echo off & setlocal'
+    'where pwsh >nul 2>&1'
+    'if errorlevel 1 ('
+    '    echo PowerShell 7 ^(pwsh.exe^) was not found.'
+    '    echo Install it from https://aka.ms/powershell'
+    '    if not "%ECLIPSADT_NO_PAUSE%"=="1" pause'
+    '    exit /b 1'
+    ')'
+    'set "ECLIPSADT_LAUNCHER=%~f0"'
+    'set "ECLIPSADT_RUN=%TEMP%\eclipsADT-o-Mat-run-%RANDOM%%RANDOM%.ps1"'
+    'copy /y "%~f0" "%ECLIPSADT_RUN%" >nul'
+    'pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%ECLIPSADT_RUN%" %*'
+    'set "exitCode=%ERRORLEVEL%"'
+    'del "%ECLIPSADT_RUN%" >nul 2>&1'
+    'if not "%exitCode%"=="0" echo eclipsADT-o-Mat exited with code %exitCode%.'
+    'if not "%ECLIPSADT_NO_PAUSE%"=="1" pause'
+    'exit /b %exitCode%'
+    '#>'
+    ''
+)
+# CRLF is required for cmd.exe; no BOM, because cmd.exe chokes on BOM bytes.
+$cmdText = ($cmdHeaderLines -join "`r`n") + $text
+$cmdOutputPath = [System.IO.Path]::ChangeExtension($OutputPath, '.cmd')
+
+$parseErrors = $null
+[System.Management.Automation.Language.Parser]::ParseInput($cmdText, [ref]$tokens, [ref]$parseErrors) | Out-Null
+if ($parseErrors -and $parseErrors.Count -gt 0) {
+    $parseErrors | ForEach-Object { Write-Host "  $($_.Extent.StartLineNumber): $($_.Message)" -ForegroundColor Red }
+    throw "Bundled .cmd launcher has $($parseErrors.Count) parse error(s)."
+}
+[System.IO.File]::WriteAllText($cmdOutputPath, $cmdText, [System.Text.UTF8Encoding]::new($false))
+Write-Host "Wrote $cmdOutputPath ($([math]::Round((Get-Item -LiteralPath $cmdOutputPath).Length / 1KB)) KB)" -ForegroundColor Green
