@@ -45,6 +45,19 @@ external tooling is required beyond PowerShell and the Eclipse package itself
 
 ## Usage
 
+### Single-file download (recommended)
+
+Download `eclipsADT-o-mat.ps1` from the
+[latest release](https://github.com/DevEpos/eclipsADT-o-mat/releases/latest) -
+it bundles all scripts and the catalog into one file - and run it:
+
+```shell
+pwsh -ExecutionPolicy Bypass -File .\eclipsADT-o-mat.ps1
+```
+
+On startup it checks GitHub for a newer release and offers to update itself
+in place. All parameters described below work identically.
+
 ### Interactive wizard
 
 ```shell
@@ -118,8 +131,12 @@ plugin ids without installing anything:
 
 ### Updating the sources
 
-On startup, the wizard checks whether the local sources (`catalog.json`,
-scripts) differ from the GitHub repository and offers to update them. This
+The single-file release checks the GitHub releases on startup and, after
+confirmation, downloads the newer version over itself and restarts.
+
+When running from a repo checkout (git clone or zip download), the wizard
+instead checks whether the local sources (`catalog.json`, scripts) differ
+from the GitHub repository and offers to update them. This
 works without git - installations downloaded as a zip are supported as well.
 The check can also be run standalone:
 
@@ -151,7 +168,10 @@ lib/
   Menu.ps1                # console menu / multi-select prompt helpers
   Logging.ps1             # console + file logging
   Ui.ps1                  # banner, theming, spinner, notifications
-  Update.ps1              # GitHub source comparison + self-update
+  Update.ps1              # GitHub source comparison + self-update (repo checkout)
+  ReleaseUpdate.ps1       # release-based self-update (single-file distribution)
+build/
+  New-Bundle.ps1          # builds the single-file release script (CI: release.yml)
 logs/                     # created at runtime, one log file per run
 ```
 

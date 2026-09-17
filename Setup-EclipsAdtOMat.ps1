@@ -93,6 +93,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# Set to the release tag by build/New-Bundle.ps1; $null = running from a repo checkout.
+$script:DistributionVersion = $null
+
+#region bundled-libs
 . (Join-Path $scriptRoot 'lib\Logging.ps1')
 . (Join-Path $scriptRoot 'lib\Ui.ps1')
 . (Join-Path $scriptRoot 'lib\Download.ps1')
@@ -102,12 +106,16 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptRoot 'lib\Catalog.ps1')
 . (Join-Path $scriptRoot 'lib\Wizard.ps1')
 . (Join-Path $scriptRoot 'lib\Update.ps1')
+. (Join-Path $scriptRoot 'lib\ReleaseUpdate.ps1')
+#endregion bundled-libs
 
+#region bundled-catalog
 $catalogPath = Join-Path $scriptRoot 'catalog.json'
 if (-not (Test-Path -LiteralPath $catalogPath)) {
     throw "catalog.json not found at '$catalogPath'."
 }
 $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json
+#endregion bundled-catalog
 Write-Log "Loaded catalog: $($catalog.basePackages.Count) base package(s), $($catalog.eclipseVersions.Count) Eclipse version(s), $($catalog.plugins.Count) plugin(s)" -Level DEBUG
 
 if ($ListFeatures) {
@@ -128,30 +136,51 @@ if ($ListFeatures) {
     return
 }
 
-Initialize-BundlerLog -LogDirectory (Join-Path $scriptRoot 'logs') | Out-Null
+# The bundled single-file release must not litter the download folder with logs.
+$logDirectory = $script:DistributionVersion ? (Join-Path $env:LOCALAPPDATA 'eclipsADT-o-Mat\logs') : (Join-Path $scriptRoot 'logs')
+Initialize-BundlerLog -LogDirectory $logDirectory | Out-Null
 Write-Log "Parameters: InstallPath='$InstallPath' BasePackage='$BasePackage' EclipseVersion='$EclipseVersion' Features=$($Features -join ',') DevEposChannel='$DevEposChannel' NonInteractive=$NonInteractive CacheDirectory='$CacheDirectory'" -Level DEBUG
 
 if (-not $NonInteractive -and (Test-InteractiveConsole)) {
     Write-Banner -Title 'eclipsADT-o-Mat' -Subtitle 'Installer for Eclipse + ABAP Development Tools + Additional Plugins'
 }
-Write-Log "eclipsADT-o-Mat starting." -Level INFO
+Write-Log ("eclipsADT-o-Mat starting." + ($script:DistributionVersion ? " (version $script:DistributionVersion)" : '')) -Level INFO
 
 # --- Update check --------------------------------------------------------------
 if (-not $SkipUpdateCheck -and -not $NonInteractive) {
-    $changedFiles = Test-SourceUpdateAvailable -ScriptRoot $scriptRoot
-    if ($changedFiles -and $changedFiles.Count -gt 0) {
-        Write-Log "An update is available: $($changedFiles.Count) file(s) differ from GitHub ($($changedFiles -join ', '))" -Level DEBUG
-        Write-UpdateNotice -ChangedFiles $changedFiles
-        if (Read-YesNo "Update local sources now? (local changes to these files will be overwritten)") {
-            if (Invoke-SourceUpdate -ScriptRoot $scriptRoot) {
-                Write-Log "Restarting wizard with updated sources..." -Level INFO
-                Write-Host ""
-                $restartParams = @{} + $PSBoundParameters
-                $restartParams['SkipUpdateCheck'] = $true
-                & $PSCommandPath @restartParams
-                exit $LASTEXITCODE
+    if ($script:DistributionVersion) {
+        # Single-file release: compare against the latest GitHub release and replace this script.
+        $release = Test-ReleaseUpdateAvailable -CurrentVersion $script:DistributionVersion
+        if ($release) {
+            Write-ReleaseUpdateNotice -Release $release -CurrentVersion $script:DistributionVersion
+            if (Read-YesNo "Update to $($release.Tag) now?") {
+                if (Invoke-ReleaseSelfUpdate -ScriptPath $PSCommandPath -Release $release) {
+                    Write-Log "Restarting wizard with the updated version..." -Level INFO
+                    Write-Host ""
+                    $restartParams = @{} + $PSBoundParameters
+                    $restartParams['SkipUpdateCheck'] = $true
+                    & $PSCommandPath @restartParams
+                    exit $LASTEXITCODE
+                }
+                Write-Log "Continuing with the current version." -Level WARN
             }
-            Write-Log "Continuing with the existing local sources." -Level WARN
+        }
+    } else {
+        $changedFiles = Test-SourceUpdateAvailable -ScriptRoot $scriptRoot
+        if ($changedFiles -and $changedFiles.Count -gt 0) {
+            Write-Log "An update is available: $($changedFiles.Count) file(s) differ from GitHub ($($changedFiles -join ', '))" -Level DEBUG
+            Write-UpdateNotice -ChangedFiles $changedFiles
+            if (Read-YesNo "Update local sources now? (local changes to these files will be overwritten)") {
+                if (Invoke-SourceUpdate -ScriptRoot $scriptRoot) {
+                    Write-Log "Restarting wizard with updated sources..." -Level INFO
+                    Write-Host ""
+                    $restartParams = @{} + $PSBoundParameters
+                    $restartParams['SkipUpdateCheck'] = $true
+                    & $PSCommandPath @restartParams
+                    exit $LASTEXITCODE
+                }
+                Write-Log "Continuing with the existing local sources." -Level WARN
+            }
         }
     }
 }
