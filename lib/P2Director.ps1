@@ -72,9 +72,15 @@ function Invoke-ProcessWithSpinnerCapture {
     $stdoutFile = "$tempBase.out.log"
     $stderrFile = "$tempBase.err.log"
 
+    # Start-Process -ArgumentList just joins array elements with spaces without quoting,
+    # so arguments containing spaces (e.g. an install path) must be quoted ourselves.
+    $quotedArgumentList = $ArgumentList | ForEach-Object {
+        if ($_ -match '\s') { '"{0}"' -f ($_ -replace '"', '\"') } else { $_ }
+    }
+
     $spinner = Start-ConsoleSpinner -Activity $SpinnerActivity
     try {
-        $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -NoNewWindow -PassThru `
+        $proc = Start-Process -FilePath $FilePath -ArgumentList $quotedArgumentList -NoNewWindow -PassThru `
             -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
         while (-not $proc.HasExited) {
             $lastLine = Get-Content -LiteralPath $stdoutFile -Tail 1 -ErrorAction SilentlyContinue
