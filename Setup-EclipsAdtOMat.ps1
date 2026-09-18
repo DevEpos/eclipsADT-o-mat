@@ -71,16 +71,16 @@
     only). The check is also skipped in -NonInteractive mode.
 
 .EXAMPLE
-    .\Setup-AdtEclipse.ps1
+    .\Setup-EclipsAdtOMat.ps1
     Runs the full interactive wizard.
 
 .EXAMPLE
-    .\Setup-AdtEclipse.ps1 -NonInteractive -EclipseVersion 2025-06 `
+    .\Setup-EclipsAdtOMat.ps1 -NonInteractive -EclipseVersion 2025-06 `
         -InstallPath C:\dev\eclipse-adt -Features devepos-search-tools,devepos-tags
     Unattended install for scripting/CI use.
 
 .EXAMPLE
-    .\Setup-AdtEclipse.ps1 -NonInteractive -Mode Modify -InstallPath C:\dev\eclipse-adt `
+    .\Setup-EclipsAdtOMat.ps1 -NonInteractive -Mode Modify -InstallPath C:\dev\eclipse-adt `
         -Features devepos-search-tools
     Unattended: adds ADT and a plugin to the existing installation, detecting
     its Eclipse version and base package automatically.

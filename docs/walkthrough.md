@@ -10,20 +10,22 @@ to an existing one. When modifying an existing installation, you only pick
 its folder - the Eclipse version and base package are detected automatically
 and steps 2 and 3 below are skipped.
 
+![Installation mode](1-installation-mode.png)
+
 ## Base Eclipse package selection (2/7)
 
 Choose the base Eclipse package to install: "Eclipse IDE for Java
 Developers", "Eclipse IDE for RCP and RAP Developers", or "Eclipse Platform"
 (core runtime only).
 
-![Eclipse type selection](1-eclipse-type-selection.png)
+![Eclipse type selection](2-eclipse-type-selection.png)
 
 ## Eclipse release train selection (3/7)
 
 Pick the Eclipse release train to install. The latest version supported by
 the chosen base package is preselected.
 
-![Eclipse version selection](2-eclipse-version-selection.png)
+![Eclipse version selection](3-eclipse-version-selection.png)
 
 ## Installation folder selection (4/7)
 
@@ -31,25 +33,25 @@ Choose where Eclipse should be installed, or accept the suggested default
 path. Folders that already contain an Eclipse installation are rejected -
 restart and choose the "modify" mode to add ADT and plugins to one.
 
-![Installation folder selection](3-installation-folder-selection.png)
+![Installation folder selection](4-install-folder-selection.png)
 
 ## Plugin selection (5/7)
 
 Select which additional ADT plugins to install alongside ADT itself, which
 is always installed.
 
-![Plugin selection](4-plugin-selection.png)
+![Plugin selection](5-plugin-selection.png)
 
 ## Confirmation (6/7)
 
 Review a summary of all selections before the download and installation
 begins.
 
-![Confirmation](5-confirmation.png)
+![Confirmation](6-confimation.png)
 
 ## Installation summary (7/7)
 
 Once installation finishes, a summary shows the status of every installed
 component and the path to launch Eclipse.
 
-![Installation summary](6-summary.png)
+![Installation summary](7-summary.png)

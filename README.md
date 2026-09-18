@@ -15,6 +15,7 @@ lets you pick additional ADT features to install alongside it:
 | ABAP Code Search                         | DevEpos            | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/code-search>  |
 | PDT Tools (ADT Plugin Development Tools) | DevEpos            | <https://github.com/DevEpos/eclipse-adt-plugins/tree/main/features/pdt-tools>    |
 | ABAP cleaner                             | SAP                | <https://github.com/SAP/abap-cleaner>                                            |
+| abapGit for ABAP Development Tools (ADT) | abapGit            | <https://eclipse.abapgit.org/>                                                   |
 | ABAP Favorites                           | ABAPBlog           | <https://github.com/fidley/ABAPFavorites>                                        |
 | ABAP Quick Fix                           | ABAPBlog           | <https://github.com/fidley/ABAPQuickFix>                                         |
 | ADT Classic Outline                      | ABAPBlog           | <https://github.com/fidley/ADT-Classic-Outline-Frontend>                         |
@@ -140,18 +141,18 @@ plugin ids without installing anything:
 
 ### Parameters
 
-| Parameter          | Description                                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `-Mode`            | `New` (default) creates a fresh installation and fails if the target contains an Eclipse; `Modify` adds ADT/plugins to an existing one. |
+| Parameter          | Description                                                                                                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-Mode`            | `New` (default) creates a fresh installation and fails if the target contains an Eclipse; `Modify` adds ADT/plugins to an existing one.                                    |
 | `-InstallPath`     | Target directory (`New`: an `eclipse` subfolder is used when the target already exists; `Modify`: folder of the existing installation). Defaults to `~\Documents\eclipse`. |
-| `-BasePackage`     | Base Eclipse package id from `catalog.json`: `java` (default), `rcp` or `platform`. Auto-detected with `-Mode Modify`. |
-| `-EclipseVersion`  | Eclipse release train id, e.g. `2026-09`. Required with `-NonInteractive` unless `-Mode Modify` (auto-detected). Must be supported by `-BasePackage`. |
-| `-Features`        | Array of plugin ids from `catalog.json` to install (non-interactive mode only).                                    |
-| `-DevEposChannel`  | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`).                           |
-| `-NonInteractive`  | Suppresses all prompts.                                                                                            |
-| `-CacheDirectory`  | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\eclipsADT-o-Mat\cache`.                      |
-| `-ListFeatures`    | Prints the catalog contents and exits.                                                                             |
-| `-SkipUpdateCheck` | Skips the startup check for a newer release (single-file distribution only; also skipped with `-NonInteractive`).  |
+| `-BasePackage`     | Base Eclipse package id from `catalog.json`: `java` (default), `rcp` or `platform`. Auto-detected with `-Mode Modify`.                                                     |
+| `-EclipseVersion`  | Eclipse release train id, e.g. `2026-09`. Required with `-NonInteractive` unless `-Mode Modify` (auto-detected). Must be supported by `-BasePackage`.                      |
+| `-Features`        | Array of plugin ids from `catalog.json` to install (non-interactive mode only).                                                                                            |
+| `-DevEposChannel`  | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`).                                                                                   |
+| `-NonInteractive`  | Suppresses all prompts.                                                                                                                                                    |
+| `-CacheDirectory`  | Where downloaded Eclipse zips are cached. Defaults to `%LOCALAPPDATA%\eclipsADT-o-Mat\cache`.                                                                              |
+| `-ListFeatures`    | Prints the catalog contents and exits.                                                                                                                                     |
+| `-SkipUpdateCheck` | Skips the startup check for a newer release (single-file distribution only; also skipped with `-NonInteractive`).                                                          |
 
 ### Updating the sources
 
@@ -170,11 +171,16 @@ catalog.json            # data-driven catalog: base packages, Eclipse versions,
                          # ADT repo(s) + installable units, DevEpos channels/plugins
                          # + third-party plugins
 lib/
-  Download.ps1           # cache-aware download + Eclipse zip extraction
+  Catalog.ps1             # catalog loading + base-package/version lookup helpers
+  Download.ps1            # cache-aware download + Eclipse zip extraction
+  EclipseInstall.ps1      # detects/validates existing Eclipse installations (Mode Modify)
+  EclipseReleaseCheck.ps1 # scrapes Eclipse for new release trains, updates catalog.json
+  JreProvision.ps1        # downloads a JustJ JRE for the JVM-less 'platform' package
   P2Director.ps1          # wrapper around eclipsec.exe's p2 director
   Menu.ps1                # console menu / multi-select prompt helpers
   Logging.ps1             # console + file logging
   Ui.ps1                  # banner, theming, spinner, notifications
+  Wizard.ps1              # orchestrates the interactive/unattended wizard steps
   ReleaseUpdate.ps1       # release-based self-update (single-file distribution)
 build/
   New-Bundle.ps1          # builds the single-file release script (CI: release.yml)
