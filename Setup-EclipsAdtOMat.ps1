@@ -120,6 +120,7 @@ $script:DistributionVersion = $null
 . (Join-Path $scriptRoot 'lib\Logging.ps1')
 . (Join-Path $scriptRoot 'lib\Ui.ps1')
 . (Join-Path $scriptRoot 'lib\Download.ps1')
+. (Join-Path $scriptRoot 'lib\JreProvision.ps1')
 . (Join-Path $scriptRoot 'lib\P2Director.ps1')
 . (Join-Path $scriptRoot 'lib\EclipseInstall.ps1')
 . (Join-Path $scriptRoot 'lib\Menu.ps1')

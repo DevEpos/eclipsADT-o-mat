@@ -87,7 +87,11 @@ You'll be prompted for:
    (default), "Eclipse IDE for RCP and RAP Developers" (for Eclipse
    plug-in/PDE development), or "Eclipse Platform" (minimal core runtime
    only, no language tooling - everything, including ADT, is added via p2
-   afterwards).
+   afterwards). Unlike the other packages, the "Eclipse Platform" package
+   ships without an embedded JRE; if no Java 21+ runtime is found on the
+   machine, the wizard automatically downloads an
+   [Eclipse JustJ](https://eclipse.dev/justj/) JRE into the installation's
+   `jre` folder so Eclipse can launch.
 3. The Eclipse release train to install (e.g. `2026-09`) - the latest
    version supported by the chosen base package is preselected. Note that
    the "Eclipse Platform" package is only available for a curated subset of

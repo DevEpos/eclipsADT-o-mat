@@ -388,6 +388,10 @@ function Resolve-EclipseInstallation {
         $zipPath = Get-CachedFile -Url $resolvedDownload.Url -FallbackUrl $resolvedDownload.FallbackUrl -CacheDirectory $CacheDirectory -FileName $resolvedDownload.ZipFileName
         $eclipseRoot = Expand-EclipseZip -ZipPath $zipPath -InstallPath $InstallPath
     }
+    # The minimal 'platform' package ships without a JVM; provision one so eclipsec.exe can run.
+    if (-not (Test-EclipseJavaRuntime -EclipseRoot $eclipseRoot)) {
+        Install-EclipseJre -EclipseRoot $eclipseRoot -CacheDirectory $CacheDirectory
+    }
     $eclipseExe = Join-Path $eclipseRoot 'eclipsec.exe'
     Write-Log "Eclipse root: '$eclipseRoot', eclipsec.exe: '$eclipseExe'" -Level DEBUG
     return [PSCustomObject]@{ EclipseRoot = $eclipseRoot; EclipseExePath = $eclipseExe }
