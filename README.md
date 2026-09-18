@@ -79,22 +79,27 @@ remain visible.
 
 You'll be prompted for:
 
-1. The base Eclipse package to install: "Eclipse IDE for Java Developers"
+1. Whether to create a new Eclipse installation or add ADT and plugins to an
+   existing one. When modifying an existing installation, you only pick its
+   folder - the Eclipse version and base package are detected automatically
+   and the base package / release selection steps are skipped.
+2. The base Eclipse package to install: "Eclipse IDE for Java Developers"
    (default), "Eclipse IDE for RCP and RAP Developers" (for Eclipse
    plug-in/PDE development), or "Eclipse Platform" (minimal core runtime
    only, no language tooling - everything, including ADT, is added via p2
    afterwards).
-2. The Eclipse release train to install (e.g. `2026-09`) - the latest
+3. The Eclipse release train to install (e.g. `2026-09`) - the latest
    version supported by the chosen base package is preselected. Note that
    the "Eclipse Platform" package is only available for a curated subset of
    release trains (see `catalog.json`'s `basePackages[].downloads`).
-3. The install directory. Press `B` at this prompt to choose a folder in
+4. The install directory. Press `B` at this prompt to choose a folder in
   Windows Explorer, or type a path directly. If it already exists, Eclipse
   is placed in an `eclipse` subfolder; a new directory is used as the
-  Eclipse root.
-4. Which additional plugins to install alongside ADT (multi-select: toggle a
+  Eclipse root. Folders that already contain an Eclipse installation are
+  rejected - use the "modify" mode for those.
+5. Which additional plugins to install alongside ADT (multi-select: toggle a
    number, `a` = all, `n` = none, Enter to confirm).
-5. If you selected any DevEpos plugin: which DevEpos channel to use for all
+6. If you selected any DevEpos plugin: which DevEpos channel to use for all
    selected DevEpos plugins: `dev` or `latest`.
 
 The wizard then downloads the matching base Eclipse package (cached locally
@@ -112,6 +117,12 @@ director headlessly to install ADT and your chosen plugins.
   Use `-BasePackage rcp` or `-BasePackage platform` to install onto a
   different base package. Defaults to `java` when omitted.
 
+  Use `-Mode Modify` to add ADT and plugins to an existing installation at
+  `-InstallPath` - its Eclipse version and base package are detected
+  automatically, so `-EclipseVersion` is not required. The default
+  `-Mode New` fails if the target folder already contains an Eclipse
+  installation.
+
   Use `-DevEposChannel dev` to install selected DevEpos plugins from the
   development channel. The default is `latest`, and one channel is always used
   for all selected DevEpos plugins.
@@ -127,9 +138,10 @@ plugin ids without installing anything:
 
 | Parameter          | Description                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `-InstallPath`     | Target directory. An `eclipse` subfolder is used only when the target already exists. Defaults to `.\eclipse-adt`. |
-| `-BasePackage`     | Base Eclipse package id from `catalog.json`: `java` (default), `rcp` or `platform`.                                |
-| `-EclipseVersion`  | Eclipse release train id, e.g. `2026-09`. Required with `-NonInteractive`. Must be supported by `-BasePackage`.    |
+| `-Mode`            | `New` (default) creates a fresh installation and fails if the target contains an Eclipse; `Modify` adds ADT/plugins to an existing one. |
+| `-InstallPath`     | Target directory (`New`: an `eclipse` subfolder is used when the target already exists; `Modify`: folder of the existing installation). Defaults to `~\Documents\eclipse`. |
+| `-BasePackage`     | Base Eclipse package id from `catalog.json`: `java` (default), `rcp` or `platform`. Auto-detected with `-Mode Modify`. |
+| `-EclipseVersion`  | Eclipse release train id, e.g. `2026-09`. Required with `-NonInteractive` unless `-Mode Modify` (auto-detected). Must be supported by `-BasePackage`. |
 | `-Features`        | Array of plugin ids from `catalog.json` to install (non-interactive mode only).                                    |
 | `-DevEposChannel`  | DevEpos channel for all selected DevEpos plugins: `dev` or `latest` (default: `latest`).                           |
 | `-NonInteractive`  | Suppresses all prompts.                                                                                            |

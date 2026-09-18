@@ -13,23 +13,34 @@
     Can also be run unattended by supplying -EclipseVersion, -InstallPath,
     -Features and -NonInteractive, e.g. for scripted setups.
 
+.PARAMETER Mode
+    'New' creates a fresh Eclipse installation and fails if the target folder
+    already contains an Eclipse installation (eclipse.exe). 'Modify' adds ADT
+    and plugins to an existing installation at -InstallPath, auto-detecting
+    its Eclipse version and base package. If omitted, interactive mode asks
+    as the first wizard step; -NonInteractive defaults to 'New'.
+
 .PARAMETER InstallPath
-    Directory where the Eclipse installation will be created. If the directory
-    already exists and is not empty, a subfolder 'eclipse' will be created
-    inside it. Defaults to '~\Documents\eclipse'.
+    Directory where the Eclipse installation will be created (-Mode New; if
+    the directory already exists and is not empty, a subfolder 'eclipse' will
+    be created inside it) or where the existing installation to modify is
+    located (-Mode Modify). Defaults to '~\Documents\eclipse'.
 
 .PARAMETER BasePackage
     Base Eclipse package id to install from catalog.json's basePackages, e.g.
     'java', 'rcp' or 'platform'. Defaults to the catalog's default package
     ('java'). Use -ListFeatures to see all available ids. Note that the
     'platform' package (minimal core runtime) is only available for a subset
-    of Eclipse versions - see -ListFeatures.
+    of Eclipse versions - see -ListFeatures. With -Mode Modify the base
+    package is auto-detected from the existing installation; if supplied, it
+    must match the detected package.
 
 .PARAMETER EclipseVersion
     Eclipse release train id, e.g. '2025-06'. Must match an entry in
     catalog.json and be supported by the selected -BasePackage. If omitted in
     interactive mode, you'll be prompted; the most recent supported version is
-    preselected.
+    preselected. With -Mode Modify the version is auto-detected from the
+    existing installation; if supplied, it must match the detected version.
 
 .PARAMETER Features
     Array of plugin ids from catalog.json to install in addition to ADT,
@@ -42,9 +53,10 @@
     is chosen after plugin selection.
 
 .PARAMETER NonInteractive
-    Suppresses all prompts. Requires -EclipseVersion. -InstallPath and
-    -Features fall back to defaults (default install path, no extra plugins)
-    if not supplied.
+    Suppresses all prompts. Requires -EclipseVersion unless -Mode Modify is
+    used (where it is auto-detected). -Mode, -InstallPath and -Features fall
+    back to defaults ('New', default install path, no extra plugins) if not
+    supplied.
 
 .PARAMETER CacheDirectory
     Directory used to cache the downloaded Eclipse zip so re-runs don't
@@ -66,9 +78,18 @@
     .\Setup-AdtEclipse.ps1 -NonInteractive -EclipseVersion 2025-06 `
         -InstallPath C:\dev\eclipse-adt -Features devepos-search-tools,devepos-tags
     Unattended install for scripting/CI use.
+
+.EXAMPLE
+    .\Setup-AdtEclipse.ps1 -NonInteractive -Mode Modify -InstallPath C:\dev\eclipse-adt `
+        -Features devepos-search-tools
+    Unattended: adds ADT and a plugin to the existing installation, detecting
+    its Eclipse version and base package automatically.
 #>
 [CmdletBinding()]
 param(
+    [ValidateSet('New', 'Modify')]
+    [string]$Mode,
+
     [string]$InstallPath,
 
     [string]$BasePackage,
@@ -138,7 +159,7 @@ if ($ListFeatures) {
 # The bundled single-file release must not litter the download folder with logs.
 $logDirectory = $script:DistributionVersion ? (Join-Path $env:LOCALAPPDATA 'eclipsADT-o-Mat\logs') : (Join-Path $scriptRoot 'logs')
 Initialize-BundlerLog -LogDirectory $logDirectory | Out-Null
-Write-Log "Parameters: InstallPath='$InstallPath' BasePackage='$BasePackage' EclipseVersion='$EclipseVersion' Features=$($Features -join ',') DevEposChannel='$DevEposChannel' NonInteractive=$NonInteractive CacheDirectory='$CacheDirectory'" -Level DEBUG
+Write-Log "Parameters: Mode='$Mode' InstallPath='$InstallPath' BasePackage='$BasePackage' EclipseVersion='$EclipseVersion' Features=$($Features -join ',') DevEposChannel='$DevEposChannel' NonInteractive=$NonInteractive CacheDirectory='$CacheDirectory'" -Level DEBUG
 
 if (-not $NonInteractive -and (Test-InteractiveConsole)) {
     $bannerTitle = $script:DistributionVersion ? "eclipsADT-o-Mat $script:DistributionVersion" : 'eclipsADT-o-Mat'
@@ -167,43 +188,61 @@ if (-not $SkipUpdateCheck -and -not $NonInteractive -and $script:DistributionVer
     }
 }
 
-if ($NonInteractive -and -not $EclipseVersion) {
+# --- Step 1: installation mode --------------------------------------------------
+$Mode = Resolve-InstallMode -Mode $Mode -NonInteractive:$NonInteractive
+
+if ($NonInteractive -and $Mode -eq 'New' -and -not $EclipseVersion) {
     throw "-NonInteractive requires -EclipseVersion to be specified (use -ListFeatures to see available versions)."
 }
 
-# --- Step 1: base package -----------------------------------------------------
-$basePackageEntry = Resolve-BasePackageSelection -Catalog $catalog -BasePackage $BasePackage -NonInteractive:$NonInteractive
+if ($Mode -eq 'Modify') {
+    # --- Step 2 (modify): existing installation - detects version & base package --
+    $existingSelection = Resolve-ExistingInstallSelection -Catalog $catalog -BasePackage $BasePackage `
+        -EclipseVersion $EclipseVersion -InstallPath $InstallPath -NonInteractive:$NonInteractive
+    if (-not $existingSelection) { exit 0 }
+    $basePackageEntry = $existingSelection.BasePackageEntry
+    $EclipseVersion = $existingSelection.EclipseVersion
+    $InstallPath = $existingSelection.InstallPath
+    $reuseExistingEclipseRoot = $existingSelection.EclipseRoot
+    $stepPlugins = 3; $stepConfirm = 4; $stepInstall = 5; $stepTotal = 5
+} else {
+    # --- Step 2: base package ---------------------------------------------------
+    $basePackageEntry = Resolve-BasePackageSelection -Catalog $catalog -BasePackage $BasePackage -NonInteractive:$NonInteractive
 
-# --- Step 2: Eclipse version --------------------------------------------------
-$EclipseVersion = Resolve-EclipseVersionSelection -Catalog $catalog -BasePackageEntry $basePackageEntry -EclipseVersion $EclipseVersion -NonInteractive:$NonInteractive
+    # --- Step 3: Eclipse version ------------------------------------------------
+    $EclipseVersion = Resolve-EclipseVersionSelection -Catalog $catalog -BasePackageEntry $basePackageEntry -EclipseVersion $EclipseVersion -NonInteractive:$NonInteractive
 
-# --- Step 3: install path ----------------------------------------------------
-$installLocation = Resolve-InstallLocation -Catalog $catalog -BasePackageEntry $basePackageEntry -EclipseVersion $EclipseVersion -InstallPath $InstallPath -NonInteractive:$NonInteractive
-if (-not $installLocation) { exit 0 }
-$InstallPath = $installLocation.InstallPath
-$reuseExistingEclipseRoot = $installLocation.ReuseExistingEclipseRoot
+    # --- Step 4: install path - must not contain an existing Eclipse -------------
+    $InstallPath = Resolve-InstallLocation -InstallPath $InstallPath -NonInteractive:$NonInteractive
+    if (-not $InstallPath) { exit 0 }
+    $reuseExistingEclipseRoot = $null
+    $stepPlugins = 5; $stepConfirm = 6; $stepInstall = 7; $stepTotal = 7
+}
 
-# --- Step 4: plugin selection -------------------------------------------------
+# --- Plugin selection -----------------------------------------------------------
 # @() guards against PowerShell unrolling an empty result to $null, which would
 # otherwise make downstream "$SelectedPlugins | Where-Object { ... }" pipelines
 # treat $null itself as a phantom selected plugin.
-$selectedPlugins = @(Resolve-PluginSelection -Catalog $catalog -BasePackageEntry $basePackageEntry -Features $Features -NonInteractive:$NonInteractive)
+$selectedPlugins = @(Resolve-PluginSelection -Catalog $catalog -BasePackageEntry $basePackageEntry -Features $Features `
+    -NonInteractive:$NonInteractive -Step $stepPlugins -Total $stepTotal)
 $activeDevEposChannel = Resolve-DevEposChannel -Catalog $catalog -SelectedPlugins $selectedPlugins -DevEposChannel $DevEposChannel -NonInteractive:$NonInteractive
 
-# --- Step 5: confirmation -----------------------------------------------------
+# --- Confirmation ---------------------------------------------------------------
 if (-not $NonInteractive) {
     $confirmed = Show-InstallationSummary -Catalog $catalog -BasePackageEntry $basePackageEntry -EclipseVersion $EclipseVersion `
         -InstallPath $InstallPath -ReuseExistingEclipseRoot $reuseExistingEclipseRoot `
-        -SelectedPlugins $selectedPlugins -ActiveDevEposChannel $activeDevEposChannel
+        -SelectedPlugins $selectedPlugins -ActiveDevEposChannel $activeDevEposChannel `
+        -Step $stepConfirm -Total $stepTotal
     if (-not $confirmed) {
         Write-Log "Aborted by user." -Level WARN
         exit 0
     }
 }
 
-# --- Step 6: download, extract & install --------------------------------------
+# --- Download, extract & install ------------------------------------------------
 if (-not $NonInteractive) {
-    Write-StepHeader -Step 6 -Total 6 -Title 'Download & install'
+    $installTitle = $Mode -eq 'Modify' ? 'Install' : 'Download & install'
+    Write-StepHeader -Step $stepInstall -Total $stepTotal -Title $installTitle
 }
 
 $installation = Resolve-EclipseInstallation -BasePackageEntry $basePackageEntry -EclipseVersion $EclipseVersion `

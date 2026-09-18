@@ -10,11 +10,40 @@
     main script so that step orchestration stays readable as a short pipeline.
 #>
 
+function Resolve-InstallMode {
+    <#
+    .SYNOPSIS
+        Step 1: resolves whether to create a new Eclipse installation or
+        modify an existing one. Defaults to 'New' when -Mode was not given
+        in non-interactive mode.
+    #>
+    param(
+        [string]$Mode,
+        [switch]$NonInteractive
+    )
+
+    if (-not $Mode) {
+        if ($NonInteractive) {
+            $Mode = 'New'
+        } else {
+            Write-StepHeader -Step 1 -Title 'Installation mode'
+            $options = @(
+                [PSCustomObject]@{ id = 'New'; label = 'Create a new Eclipse installation' }
+                [PSCustomObject]@{ id = 'Modify'; label = 'Add ADT and plugins to an existing Eclipse installation' }
+            )
+            $chosen = Read-MenuChoice -Title 'What would you like to do?' -Options $options -LabelProperty 'label' -DefaultIndex 0
+            $Mode = $chosen.id
+        }
+    }
+    Write-Log "Installation mode: $Mode" -Level INFO
+    return $Mode
+}
+
 function Resolve-BasePackageSelection {
     <#
     .SYNOPSIS
-        Step 1: resolves (prompting if needed) the catalog basePackages entry
-        to install/modify.
+        Step 2 (new mode): resolves (prompting if needed) the catalog
+        basePackages entry to install.
     #>
     param(
         [Parameter(Mandatory)] $Catalog,
@@ -28,9 +57,9 @@ function Resolve-BasePackageSelection {
         if ($NonInteractive) {
             $BasePackage = $defaultBasePackage.id
         } else {
-            Write-StepHeader -Step 1 -Total 6 -Title 'Base package'
+            Write-StepHeader -Step 2 -Total 7 -Title 'Base package'
             $defaultIndex = [Math]::Max(0, [Array]::IndexOf(@($Catalog.basePackages.id), $defaultBasePackage.id))
-            $chosen = Read-MenuChoice -Title "Select the base Eclipse package to install/modify:" `
+            $chosen = Read-MenuChoice -Title "Select the base Eclipse package to install:" `
                 -Options $Catalog.basePackages -LabelProperty 'name' -DefaultIndex $defaultIndex
             $BasePackage = $chosen.id
         }
@@ -47,8 +76,9 @@ function Resolve-BasePackageSelection {
 function Resolve-EclipseVersionSelection {
     <#
     .SYNOPSIS
-        Step 2: resolves (prompting if needed) the Eclipse release train id,
-        validated against the versions the chosen base package supports.
+        Step 3 (new mode): resolves (prompting if needed) the Eclipse release
+        train id, validated against the versions the chosen base package
+        supports.
     #>
     param(
         [Parameter(Mandatory)] $Catalog,
@@ -65,7 +95,7 @@ function Resolve-EclipseVersionSelection {
 
     if (-not $EclipseVersion) {
         if ($NonInteractive) { throw "-EclipseVersion is required in non-interactive mode." }
-        Write-StepHeader -Step 2 -Total 6 -Title 'Eclipse release'
+        Write-StepHeader -Step 3 -Total 7 -Title 'Eclipse release'
         $chosen = Read-MenuChoice -Title "Select an Eclipse release train to install:" `
             -Options $supportedVersions -LabelProperty 'label' -DefaultIndex ($supportedVersions.Count - 1)
         $EclipseVersion = $chosen.id
@@ -83,36 +113,28 @@ function Resolve-EclipseVersionSelection {
 function Resolve-InstallLocation {
     <#
     .SYNOPSIS
-        Step 3: resolves the install path, detecting and (with confirmation
-        in interactive mode) reusing a compatible existing Eclipse install.
+        Step 4 (new mode): resolves the install path for a new Eclipse
+        installation. Folders already containing an Eclipse installation are
+        rejected - modifying one requires -Mode Modify.
     .OUTPUTS
-        A [PSCustomObject] with InstallPath/ReuseExistingEclipseRoot, or $null
-        if the user cancelled the installation.
+        The install path as [string], or $null if the user cancelled.
     #>
     param(
-        [Parameter(Mandatory)] $Catalog,
-        [Parameter(Mandatory)] $BasePackageEntry,
-        [Parameter(Mandatory)] [string]$EclipseVersion,
         [string]$InstallPath,
         [switch]$NonInteractive
     )
 
     $defaultPath = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'eclipse'
-    $reuseExistingEclipseRoot = $null
 
     if ($NonInteractive) {
         if (-not $InstallPath) { $InstallPath = $defaultPath }
         $existingRoot = Find-ExistingEclipse -InstallPath $InstallPath
         if ($existingRoot) {
-            if (-not (Test-ExistingEclipseCompatible -EclipseRoot $existingRoot -Catalog $Catalog -EclipseVersion $EclipseVersion -BasePackageEntry $BasePackageEntry)) {
-                Write-Log "Existing Eclipse at '$existingRoot' does not match the requested version '$EclipseVersion' / base package '$($BasePackageEntry.id)'. Installation cancelled." -Level ERROR
-                exit 1
-            }
-            Write-Log "Reusing existing Eclipse ($EclipseVersion) at '$existingRoot'." -Level INFO
-            $reuseExistingEclipseRoot = $existingRoot
+            Write-Log "An existing Eclipse installation was found at '$existingRoot'. Use -Mode Modify to add ADT and plugins to it, or choose a folder without an Eclipse installation. Installation cancelled." -Level ERROR
+            exit 1
         }
     } else {
-        Write-StepHeader -Step 3 -Total 6 -Title 'Install location'
+        Write-StepHeader -Step 4 -Total 7 -Title 'Install location'
         while ($true) {
             if (-not $InstallPath) {
                 $InstallPath = Read-PathPrompt -Message "Where should Eclipse be installed?" -DefaultPath $defaultPath
@@ -122,50 +144,115 @@ function Resolve-InstallLocation {
             if (-not $existingRoot) { break }
 
             Write-Host ""
-            Write-Host "  An existing Eclipse installation was found at: $existingRoot" -ForegroundColor Yellow
-            if (-not (Read-YesNo -Message "  Add ADT and the chosen plugins to this existing installation?" -DefaultYes $true)) {
-                Write-Host "  Please choose a different folder." -ForegroundColor DarkGray
-                $InstallPath = $null
-                continue
+            Write-Host "  This folder already contains an Eclipse installation: $existingRoot" -ForegroundColor Red
+            Write-Host "  To add ADT and plugins to it, restart and choose 'Add ADT and plugins to an existing Eclipse installation'." -ForegroundColor DarkGray
+            if (-not (Read-YesNo -Message "  Choose a different folder? (answering no cancels the installation)" -DefaultYes $true)) {
+                Write-Log "Target folder '$InstallPath' already contains an Eclipse installation at '$existingRoot'. Installation cancelled by user." -Level WARN
+                return $null
             }
-
-            $installedVersion = Resolve-EclipseVersionIdFromInstall -EclipseRoot $existingRoot -EclipseVersions $Catalog.eclipseVersions
-            if ($installedVersion -ne $EclipseVersion) {
-                $foundLabel = if ($installedVersion) { $installedVersion } else { 'unknown' }
-                Write-Host "  The existing installation is Eclipse '$foundLabel', which does not match the selected '$EclipseVersion'." -ForegroundColor Red
-                if (-not (Read-YesNo -Message "  Choose a different folder? (answering no cancels the installation)" -DefaultYes $true)) {
-                    Write-Log "Existing Eclipse at '$existingRoot' is version '$foundLabel' but '$EclipseVersion' was requested. Installation cancelled by user." -Level WARN
-                    return $null
-                }
-                $InstallPath = $null
-                continue
-            }
-
-            if (-not (Test-ExistingEclipseBasePackage -EclipseRoot $existingRoot -BasePackageEntry $BasePackageEntry)) {
-                Write-Host "  The existing installation does not match the selected base package '$($BasePackageEntry.name)'." -ForegroundColor Red
-                if (-not (Read-YesNo -Message "  Choose a different folder? (answering no cancels the installation)" -DefaultYes $true)) {
-                    Write-Log "Existing Eclipse at '$existingRoot' does not match the requested base package '$($BasePackageEntry.id)'. Installation cancelled by user." -Level WARN
-                    return $null
-                }
-                $InstallPath = $null
-                continue
-            }
-
-            Write-Host "  Version and base package match ($EclipseVersion, $($BasePackageEntry.name)) - ADT and plugins will be added to this installation." -ForegroundColor Green
-            $reuseExistingEclipseRoot = $existingRoot
-            break
+            $InstallPath = $null
         }
     }
     Write-Log "Install path: $InstallPath" -Level INFO
-    Write-Log "Reuse existing Eclipse root: $reuseExistingEclipseRoot" -Level DEBUG
 
-    return [PSCustomObject]@{ InstallPath = $InstallPath; ReuseExistingEclipseRoot = $reuseExistingEclipseRoot }
+    return $InstallPath
+}
+
+function Resolve-ExistingInstallSelection {
+    <#
+    .SYNOPSIS
+        Step 2 (modify mode): resolves the folder of the existing Eclipse
+        installation to modify, auto-detecting its Eclipse version and base
+        package. Explicit -EclipseVersion/-BasePackage values are validated
+        against what was detected.
+    .OUTPUTS
+        A [PSCustomObject] with InstallPath/EclipseRoot/BasePackageEntry/
+        EclipseVersion, or $null if the user cancelled.
+    #>
+    param(
+        [Parameter(Mandatory)] $Catalog,
+        [string]$BasePackage,
+        [string]$EclipseVersion,
+        [string]$InstallPath,
+        [switch]$NonInteractive
+    )
+
+    $defaultPath = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'eclipse'
+
+    if (-not $NonInteractive) {
+        Write-StepHeader -Step 2 -Total 5 -Title 'Existing installation'
+    }
+
+    while ($true) {
+        if (-not $InstallPath) {
+            if ($NonInteractive) {
+                $InstallPath = $defaultPath
+            } else {
+                $InstallPath = Read-PathPrompt -Message "Where is the existing Eclipse installation?" -DefaultPath $defaultPath
+            }
+        }
+
+        $failure = $null
+        $installedVersion = $null
+        $basePackageEntry = $null
+
+        $existingRoot = Find-ExistingEclipse -InstallPath $InstallPath
+        if (-not $existingRoot) {
+            $failure = "No Eclipse installation (eclipse.exe) was found at '$InstallPath'."
+        }
+
+        if (-not $failure) {
+            $installedVersion = Resolve-EclipseVersionIdFromInstall -EclipseRoot $existingRoot -EclipseVersions $Catalog.eclipseVersions
+            if (-not $installedVersion) {
+                $failure = "Could not map the installation at '$existingRoot' to a supported Eclipse version."
+            } elseif ($EclipseVersion -and $installedVersion -ne $EclipseVersion) {
+                $failure = "The installation at '$existingRoot' is Eclipse '$installedVersion', which does not match the requested '$EclipseVersion'."
+            }
+        }
+
+        if (-not $failure) {
+            $basePackageEntry = Resolve-BasePackageFromInstall -EclipseRoot $existingRoot -Catalog $Catalog
+            if (-not $basePackageEntry) {
+                $failure = "Could not map the installation at '$existingRoot' to a known base package."
+            } elseif ($BasePackage -and $basePackageEntry.id -ne $BasePackage) {
+                $failure = "The installation at '$existingRoot' uses base package '$($basePackageEntry.id)', which does not match the requested '$BasePackage'."
+            }
+        }
+
+        if ($failure) {
+            if ($NonInteractive) {
+                Write-Log "$failure Installation cancelled." -Level ERROR
+                exit 1
+            }
+            Write-Host ""
+            Write-Host "  $failure" -ForegroundColor Red
+            if (-not (Read-YesNo -Message "  Choose a different folder? (answering no cancels the installation)" -DefaultYes $true)) {
+                Write-Log "$failure Installation cancelled by user." -Level WARN
+                return $null
+            }
+            $InstallPath = $null
+            continue
+        }
+
+        if (-not $NonInteractive) {
+            Write-Host ""
+            Write-Host "  Detected Eclipse '$installedVersion' with base package '$($basePackageEntry.name)' at: $existingRoot" -ForegroundColor Green
+        }
+        Write-Log "Modifying existing Eclipse at '$existingRoot' (version '$installedVersion', base package '$($basePackageEntry.id)')." -Level INFO
+
+        return [PSCustomObject]@{
+            InstallPath      = $InstallPath
+            EclipseRoot      = $existingRoot
+            BasePackageEntry = $basePackageEntry
+            EclipseVersion   = $installedVersion
+        }
+    }
 }
 
 function Resolve-PluginSelection {
     <#
     .SYNOPSIS
-        Step 4: resolves the additional plugins to install, either from
+        Plugins step: resolves the additional plugins to install, either from
         -Features (non-interactive) or via the multi-select menu. Plugins
         restricted to specific base packages (via `requiresBasePackage`) are
         only offered/accepted when the matching base package was selected.
@@ -174,7 +261,9 @@ function Resolve-PluginSelection {
         [Parameter(Mandatory)] $Catalog,
         [Parameter(Mandatory)] $BasePackageEntry,
         [string[]]$Features,
-        [switch]$NonInteractive
+        [switch]$NonInteractive,
+        [int]$Step = 5,
+        [int]$Total = 7
     )
 
     $availablePlugins = @($Catalog.plugins | Where-Object {
@@ -194,7 +283,7 @@ function Resolve-PluginSelection {
             }
         }
     } else {
-        Write-StepHeader -Step 4 -Total 6 -Title 'Additional plugins'
+        Write-StepHeader -Step $Step -Total $Total -Title 'Additional plugins'
         $selectedPlugins = Read-MultiSelect -Title "Select additional plugins to install (ADT itself is always installed):" `
             -Options $availablePlugins -LabelProperty 'name' -DescriptionProperty 'description' -GroupProperty 'publisher'
     }
@@ -242,8 +331,8 @@ function Resolve-DevEposChannel {
 function Show-InstallationSummary {
     <#
     .SYNOPSIS
-        Step 5: prints the confirmation summary and prompts the user to
-        proceed. Returns $true if the user confirmed.
+        Confirmation step: prints the confirmation summary and prompts the
+        user to proceed. Returns $true if the user confirmed.
     #>
     param(
         [Parameter(Mandatory)] $Catalog,
@@ -252,16 +341,16 @@ function Show-InstallationSummary {
         [string]$InstallPath,
         [string]$ReuseExistingEclipseRoot,
         [object[]]$SelectedPlugins,
-        $ActiveDevEposChannel
+        $ActiveDevEposChannel,
+        [int]$Step = 6,
+        [int]$Total = 7
     )
 
-    Write-StepHeader -Step 5 -Total 6 -Title 'Confirmation'
+    Write-StepHeader -Step $Step -Total $Total -Title 'Confirmation'
     $plannedEclipseRoot = if ($ReuseExistingEclipseRoot) { $ReuseExistingEclipseRoot } else { Resolve-EclipseInstallRoot -InstallPath $InstallPath }
+    Write-Host "  Mode            : $(if ($ReuseExistingEclipseRoot) { 'modify existing installation' } else { 'new installation' })"
     Write-Host "  Eclipse version : $EclipseVersion"
     Write-Host "  Install path    : $plannedEclipseRoot"
-    if ($ReuseExistingEclipseRoot) {
-        Write-Host "  Mode            : add to existing installation"
-    }
     Write-Host "  Base package    : $($BasePackageEntry.name)"
     Write-Host "  ADT             : $($Catalog.adt.name) (always installed)"
     if ($ActiveDevEposChannel) {
@@ -280,8 +369,8 @@ function Show-InstallationSummary {
 function Resolve-EclipseInstallation {
     <#
     .SYNOPSIS
-        Step 6a: reuses the existing Eclipse root, or downloads (with cache)
-        and extracts the chosen base package's zip.
+        Install step (a): reuses the existing Eclipse root, or downloads
+        (with cache) and extracts the chosen base package's zip.
     #>
     param(
         [Parameter(Mandatory)] $BasePackageEntry,
@@ -307,7 +396,7 @@ function Resolve-EclipseInstallation {
 function Install-AdtAndPlugins {
     <#
     .SYNOPSIS
-        Step 6b: installs ADT (required) plus any selected DevEpos and
+        Install step (b): installs ADT (required) plus any selected DevEpos and
         third-party plugins, via the p2 director. Returns an array of
         [PSCustomObject]@{ Name; Success } results for the summary step.
 

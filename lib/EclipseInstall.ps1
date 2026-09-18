@@ -5,9 +5,8 @@
 
 .DESCRIPTION
     Find-ExistingEclipse locates an already-extracted Eclipse install under a
-    given path. Resolve-EclipseVersionIdFromInstall / Test-ExistingEclipseBasePackage
-    / Test-ExistingEclipseCompatible check whether that install matches the
-    requested catalog release train / base package.
+    given path. Resolve-EclipseVersionIdFromInstall / Resolve-BasePackageFromInstall
+    map that install to its catalog release train / base package entry.
 #>
 
 function Resolve-EclipseInstallRoot {
@@ -102,44 +101,21 @@ function Resolve-EclipseVersionIdFromInstall {
     return $null
 }
 
-function Test-ExistingEclipseBasePackage {
+function Resolve-BasePackageFromInstall {
     <#
     .SYNOPSIS
-        Returns $true if an existing Eclipse installation's base package (its
-        p2 profile, e.g. 'epp.package.java') matches the chosen base package
-        entry from the catalog.
+        Maps an existing Eclipse installation to its catalog basePackages
+        entry by matching the install's p2 profile (e.g. 'epp.package.java'),
+        or $null if no catalog entry matches.
     #>
     param(
         [Parameter(Mandatory)] [string]$EclipseRoot,
 
-        [Parameter(Mandatory)] $BasePackageEntry
+        [Parameter(Mandatory)] $Catalog
     )
-
-    if (-not $BasePackageEntry.p2Profile) { return $true }
 
     $installedProfile = Get-EclipseP2Profile -EclipseInstallPath $EclipseRoot
-    Write-Log "Test-ExistingEclipseBasePackage: detected profile '$installedProfile' at '$EclipseRoot', expected '$($BasePackageEntry.p2Profile)'" -Level DEBUG
-    return $installedProfile -eq $BasePackageEntry.p2Profile
-}
-
-function Test-ExistingEclipseCompatible {
-    <#
-    .SYNOPSIS
-        Returns $true if an existing Eclipse installation matches both the
-        requested release train and the requested base package.
-    #>
-    param(
-        [Parameter(Mandatory)] [string]$EclipseRoot,
-
-        [Parameter(Mandatory)] $Catalog,
-
-        [Parameter(Mandatory)] [string]$EclipseVersion,
-
-        [Parameter(Mandatory)] $BasePackageEntry
-    )
-
-    $installedVersion = Resolve-EclipseVersionIdFromInstall -EclipseRoot $EclipseRoot -EclipseVersions $Catalog.eclipseVersions
-    if ($installedVersion -ne $EclipseVersion) { return $false }
-
-    return (Test-ExistingEclipseBasePackage -EclipseRoot $EclipseRoot -BasePackageEntry $BasePackageEntry)
+    $entry = $Catalog.basePackages | Where-Object { $_.p2Profile -eq $installedProfile } | Select-Object -First 1
+    Write-Log "Resolve-BasePackageFromInstall: profile '$installedProfile' at '$EclipseRoot' -> base package '$($entry.id)'" -Level DEBUG
+    return $entry
 }

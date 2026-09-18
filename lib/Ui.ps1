@@ -51,6 +51,7 @@ function Limit-UiLine {
 }
 
 $script:UiPinnedBanner = $null
+$script:UiPinnedStepHeader = $null
 
 function Write-Banner {
     param(
@@ -87,6 +88,7 @@ function Write-PinnedBanner {
         Write-Host "║" -ForegroundColor $script:UiTheme.Accent
     }
     Write-Host ("╚{0}╝" -f ('═' * $inner)) -ForegroundColor $script:UiTheme.Accent
+    if ($script:UiPinnedStepHeader) { Write-StepHeaderRule }
 }
 
 function Get-PinnedBannerHeight {
@@ -94,7 +96,18 @@ function Get-PinnedBannerHeight {
     if (-not $script:UiPinnedBanner) { return 0 }
     $height = 4 # blank line + top border + title + bottom border
     if ($script:UiPinnedBanner.Subtitle) { $height++ }
+    if ($script:UiPinnedStepHeader) { $height += 2 } # blank line + rule
     return $height
+}
+
+function Write-StepHeaderRule {
+    # Renders the pinned step header rule line (blank line + cyan rule).
+    $header = $script:UiPinnedStepHeader
+    if (-not $header) { return }
+    $label = $header.Total ? " Step $($header.Step)/$($header.Total) · $($header.Title) " : " Step $($header.Step) · $($header.Title) "
+    $ruleWidth = [Math]::Max(4, [Math]::Min((Get-UiWidth), 72) - $label.Length - 2)
+    Write-Host ""
+    Write-Host (Limit-UiLine ("──{0}{1}" -f $label, ('─' * $ruleWidth))) -ForegroundColor $script:UiTheme.Accent
 }
 
 function Write-StepHeader {
@@ -102,17 +115,16 @@ function Write-StepHeader {
         [Parameter(Mandatory)]
         [int]$Step,
 
-        [Parameter(Mandatory)]
+        # Optional: the mode step is shown before the flow's step count is known.
         [int]$Total,
 
         [Parameter(Mandatory)]
         [string]$Title
     )
 
-    $label = " Step $Step/$Total · $Title "
-    $ruleWidth = [Math]::Max(4, [Math]::Min((Get-UiWidth), 72) - $label.Length - 2)
-    Write-Host ""
-    Write-Host ("──{0}{1}" -f $label, ('─' * $ruleWidth)) -ForegroundColor $script:UiTheme.Accent
+    # Remembered so menus can redraw it (via Write-PinnedBanner) after Clear-Host.
+    $script:UiPinnedStepHeader = [PSCustomObject]@{ Step = $Step; Total = $Total; Title = $Title }
+    Write-StepHeaderRule
 }
 
 function Start-ConsoleSpinner {
