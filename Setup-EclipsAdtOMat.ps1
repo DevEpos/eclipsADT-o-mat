@@ -55,9 +55,8 @@
     without installing anything.
 
 .PARAMETER SkipUpdateCheck
-    Skips the startup check whether the local sources (catalog.json, scripts)
-    differ from the GitHub repository. The check is also skipped in
-    -NonInteractive mode.
+    Skips the startup check for a newer release (single-file distribution
+    only). The check is also skipped in -NonInteractive mode.
 
 .EXAMPLE
     .\Setup-AdtEclipse.ps1
@@ -105,7 +104,6 @@ $script:DistributionVersion = $null
 . (Join-Path $scriptRoot 'lib\Menu.ps1')
 . (Join-Path $scriptRoot 'lib\Catalog.ps1')
 . (Join-Path $scriptRoot 'lib\Wizard.ps1')
-. (Join-Path $scriptRoot 'lib\Update.ps1')
 . (Join-Path $scriptRoot 'lib\ReleaseUpdate.ps1')
 #endregion bundled-libs
 
@@ -149,41 +147,22 @@ if (-not $NonInteractive -and (Test-InteractiveConsole)) {
 Write-Log ("eclipsADT-o-Mat starting." + ($script:DistributionVersion ? " (version $script:DistributionVersion)" : '')) -Level INFO
 
 # --- Update check --------------------------------------------------------------
-if (-not $SkipUpdateCheck -and -not $NonInteractive) {
-    if ($script:DistributionVersion) {
-        # Single-file release: compare against the latest GitHub release and replace this script.
-        # When started via the .cmd launcher, update the launcher file, not the temp copy pwsh runs.
-        $updateTarget = $env:ECLIPSADT_LAUNCHER ? $env:ECLIPSADT_LAUNCHER : $PSCommandPath
-        $release = Test-ReleaseUpdateAvailable -CurrentVersion $script:DistributionVersion -AssetName (Get-ReleaseAssetName -TargetPath $updateTarget)
-        if ($release) {
-            Write-ReleaseUpdateNotice -Release $release -CurrentVersion $script:DistributionVersion
-            if (Read-YesNo "Update to $($release.Tag) now?") {
-                if (Invoke-ReleaseSelfUpdate -ScriptPath $updateTarget -Release $release) {
-                    Write-Log "Restarting wizard with the updated version..." -Level INFO
-                    Write-Host ""
-                    $restartParams = @{} + $PSBoundParameters
-                    $restartParams['SkipUpdateCheck'] = $true
-                    exit (Invoke-UpdatedScript -UpdateTarget $updateTarget -Parameters $restartParams)
-                }
-                Write-Log "Continuing with the current version." -Level WARN
+if (-not $SkipUpdateCheck -and -not $NonInteractive -and $script:DistributionVersion) {
+    # Single-file release: compare against the latest GitHub release and replace this script.
+    # When started via the .cmd launcher, update the launcher file, not the temp copy pwsh runs.
+    $updateTarget = $env:ECLIPSADT_LAUNCHER ? $env:ECLIPSADT_LAUNCHER : $PSCommandPath
+    $release = Test-ReleaseUpdateAvailable -CurrentVersion $script:DistributionVersion -AssetName (Get-ReleaseAssetName -TargetPath $updateTarget)
+    if ($release) {
+        Write-ReleaseUpdateNotice -Release $release -CurrentVersion $script:DistributionVersion
+        if (Read-YesNo "Update to $($release.Tag) now?") {
+            if (Invoke-ReleaseSelfUpdate -ScriptPath $updateTarget -Release $release) {
+                Write-Log "Restarting wizard with the updated version..." -Level INFO
+                Write-Host ""
+                $restartParams = @{} + $PSBoundParameters
+                $restartParams['SkipUpdateCheck'] = $true
+                exit (Invoke-UpdatedScript -UpdateTarget $updateTarget -Parameters $restartParams)
             }
-        }
-    } else {
-        $changedFiles = Test-SourceUpdateAvailable -ScriptRoot $scriptRoot
-        if ($changedFiles -and $changedFiles.Count -gt 0) {
-            Write-Log "An update is available: $($changedFiles.Count) file(s) differ from GitHub ($($changedFiles -join ', '))" -Level DEBUG
-            Write-UpdateNotice -ChangedFiles $changedFiles
-            if (Read-YesNo "Update local sources now? (local changes to these files will be overwritten)") {
-                if (Invoke-SourceUpdate -ScriptRoot $scriptRoot) {
-                    Write-Log "Restarting wizard with updated sources..." -Level INFO
-                    Write-Host ""
-                    $restartParams = @{} + $PSBoundParameters
-                    $restartParams['SkipUpdateCheck'] = $true
-                    & $PSCommandPath @restartParams
-                    exit $LASTEXITCODE
-                }
-                Write-Log "Continuing with the existing local sources." -Level WARN
-            }
+            Write-Log "Continuing with the current version." -Level WARN
         }
     }
 }
