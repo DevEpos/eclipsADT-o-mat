@@ -14,6 +14,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Build bundled script
         shell: pwsh
@@ -29,6 +31,14 @@ jobs:
           cmd /c "dist\eclipsADT-o-mat.cmd -ListFeatures"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Generate release notes
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip all
+        env:
+          OUTPUT: dist/RELEASE_NOTES.md
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -37,4 +47,4 @@ jobs:
           'dist/eclipsADT-o-mat.cmd'
           'dist/eclipsADT-o-mat.ps1'
           --title '${{ github.ref_name }}'
-          --generate-notes
+          --notes-file 'dist/RELEASE_NOTES.md'
