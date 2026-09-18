@@ -126,15 +126,27 @@
       "publisher": "Microsoft",
       "channel": "stable",
       "repoUrl": "https://azuredownloads-g3ahgwb5b8bkbxhd.b01.azurefd.net/github-copilot/",
-      "installableUnits": ["com.microsoft.copilot.eclipse.feature.feature.group"],
+      "installableUnits": [
+        "com.microsoft.copilot.eclipse.feature.feature.group"
+      ],
       "requiresTerminal": true
+    },
+    {
+      "id": "abapgit-adt",
+      "name": "abapGit for ABAP Development Tools (ADT)",
+      "description": "abapGit: Control abapGit repositories directly from ABAP Development Tools.",
+      "publisher": "abapGit",
+      "repoUrl": "https://eclipse.abapgit.org/updatesite/",
+      "installableUnits": ["org.abapgit.adt.feature.feature.group"]
     },
     {
       "id": "devepos-search-tools",
       "name": "ABAP Search and Analysis Tools",
       "description": "DevEpos: Enhanced search and analysis tools for ABAP repository objects.",
       "publisher": "DevEpos",
-      "installableUnits": ["com.devepos.adt.searchandanalysistools.feature.group"]
+      "installableUnits": [
+        "com.devepos.adt.searchandanalysistools.feature.group"
+      ]
     },
     {
       "id": "devepos-tags",
@@ -203,7 +215,9 @@
       "description": "ABAPBlog: ABAP-specific features for Vertical Tabs.",
       "publisher": "ABAPBlog",
       "repoUrl": "https://fidley.github.io/VerticalTabs/",
-      "installableUnits": ["com.abapblog.verticaltabs.abap.feature.feature.group"]
+      "installableUnits": [
+        "com.abapblog.verticaltabs.abap.feature.feature.group"
+      ]
     },
     {
       "id": "eclipse-marketplace-client",
