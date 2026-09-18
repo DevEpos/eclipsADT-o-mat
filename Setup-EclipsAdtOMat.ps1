@@ -143,7 +143,8 @@ Initialize-BundlerLog -LogDirectory $logDirectory | Out-Null
 Write-Log "Parameters: InstallPath='$InstallPath' BasePackage='$BasePackage' EclipseVersion='$EclipseVersion' Features=$($Features -join ',') DevEposChannel='$DevEposChannel' NonInteractive=$NonInteractive CacheDirectory='$CacheDirectory'" -Level DEBUG
 
 if (-not $NonInteractive -and (Test-InteractiveConsole)) {
-    Write-Banner -Title 'eclipsADT-o-Mat' -Subtitle 'Installer for Eclipse + ABAP Development Tools + Additional Plugins'
+    $bannerTitle = $script:DistributionVersion ? "eclipsADT-o-Mat $script:DistributionVersion" : 'eclipsADT-o-Mat'
+    Write-Banner -Title $bannerTitle -Subtitle 'Installer for Eclipse + ABAP Development Tools + Additional Plugins'
 }
 Write-Log ("eclipsADT-o-Mat starting." + ($script:DistributionVersion ? " (version $script:DistributionVersion)" : '')) -Level INFO
 
